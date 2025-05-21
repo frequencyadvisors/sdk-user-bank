@@ -4,6 +4,7 @@
 
 - Node.js (v16 or later)
 - npm
+- Hardhat
 
 ## Setup
 
