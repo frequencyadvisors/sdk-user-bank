@@ -10,6 +10,9 @@ contract MembershipNFT is ERC721Burnable, Ownable {
         uint256 expirationDate; // Timestamp when the membership expires
         string membershipType;
     }
+
+    event MembershipMinted(uint256 indexed tokenId, address indexed to, string membershipType, uint256 expirationDate);
+    event MembershipRevoked(uint256 indexed tokenId);
     uint256 private _nextTokenId;
     mapping(uint256 => Membership) private _memberships;
 
@@ -26,6 +29,8 @@ contract MembershipNFT is ERC721Burnable, Ownable {
             expirationDate: duration,
             membershipType: membershipType
         });
+
+        emit MembershipMinted(tokenId, to, membershipType, duration);
         return tokenId;
     }
 
@@ -33,6 +38,7 @@ contract MembershipNFT is ERC721Burnable, Ownable {
     function revoke(uint256 tokenId) external onlyOwner {
         _burn(tokenId);
         delete _memberships[tokenId];
+        emit MembershipRevoked(tokenId);
     }
 
     /// @notice Returns the metadata URI for a token
