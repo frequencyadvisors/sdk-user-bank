@@ -2,7 +2,7 @@ const hre = require("hardhat");
 
 async function main() {
     // Replace this with your deployed contract address
-    const contractAddress = "0x5308b2b6F49F3bf59FDA3c440C9e27ad28C0b59d";
+    const contractAddress = "0xFA59A8cB7Bc3E53DEFf88744631a1B129B0A4B0F";
 
     // Get contract factory and attach to deployed address
     const MembershipNFT = await hre.ethers.getContractFactory("MembershipNFT");
