@@ -91,7 +91,6 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
         emit MembershipMinted(_nextTokenId, to, membershipType, newMembership.writeAccess, newMembership.viewAccess, newMembership.duration);
        } 
 
-        _nextTokenId++;
         _safeMint(to, _nextTokenId);
 
         return _nextTokenId;
