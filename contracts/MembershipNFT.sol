@@ -17,7 +17,7 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
     struct Membership {
         uint256 tokenId;
         address user;
-        string membershipType;
+        string membershipType; // e.g. "write:admin" = write only access, "read:admin" = read only access, "vip", "premium', "silver" etc.
         bool writeAccess;
         bool viewAccess;
         uint256 duration; // Duration in seconds, 0 means no expiration
@@ -74,11 +74,12 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
         _membership[_nextTokenId] = adminMembership;
 
         emit MembershipMinted(_nextTokenId, to, membershipType, adminMembership.writeAccess, adminMembership.viewAccess, adminMembership.duration);
-       } else {
+       } else { 
+        // user only memberships 
         Membership memory newMembership = Membership({
             tokenId: _nextTokenId,
             user: to,
-            membershipType: membershipType,
+            membershipType: membershipType, // e.g, "vip", "premium", "silver"
             writeAccess: false,
             viewAccess: false,
             duration: block.timestamp + duration,
@@ -113,6 +114,7 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
     // marked as inactive
     function revoke(uint256 tokenId, bool hardDelete) external onlyOwner {
         Membership storage membership = _membership[tokenId];
+        require(_membership[tokenId].user != address(0), "Invalid tokenId: Membership does not exist");
 
         if(hardDelete) {
         _burn(tokenId);
