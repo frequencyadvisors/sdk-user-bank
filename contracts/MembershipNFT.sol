@@ -20,7 +20,10 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
     mapping(uint256 => Membership) private _membership;
 
     /// @dev Maps user address to their membership struct
-    mapping(address => Membership) private _addressToMembership;
+    mapping(address => mapping(string => Membership))
+        private _addressToMembership;
+
+    mapping(address => bool) private _onlyViewAdmin;
 
     /**
      * @notice Represents a membership with various access levels and properties
@@ -30,7 +33,7 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
      * @param writeAccess Whether the member has write/admin privileges
      * @param viewAccess Whether the member has view/read privileges
      * @param duration Expiration timestamp in seconds (0 means no expiration)
-     * @param isActive Whether the membership is currently active
+     * @param revoked Whether the membership is currently active
      */
     struct Membership {
         uint256 tokenId;
@@ -39,7 +42,7 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
         bool writeAccess;
         bool viewAccess;
         uint256 duration; // Duration in seconds, 0 means no expiration
-        bool isActive;
+        bool revoked;
     }
 
     /**
@@ -88,9 +91,11 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
      * @notice Ensures only admins with write access or the owner can call the function
      * @dev Checks if caller is owner or has valid admin membership with write access
      */
-    modifier onlyAdmin() {
+    modifier onlyAdmin(string memory membershipType) {
         if (owner() != msg.sender) {
-            Membership memory membership = _addressToMembership[msg.sender];
+            Membership memory membership = _addressToMembership[msg.sender][
+                membershipType
+            ];
             require(membership.writeAccess, "Caller is not an admin");
             require(
                 membership.duration == 0 ||
@@ -107,16 +112,29 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
      */
     modifier onlyViewAdmin() {
         if (owner() != msg.sender) {
-            Membership memory membership = _addressToMembership[msg.sender];
+            Membership memory membershipWrite = _addressToMembership[
+                msg.sender
+            ]["write:admin"];
+            Membership memory membershipReadOnly = _addressToMembership[
+                msg.sender
+            ]["read:admin"];
+            bool canView = _onlyViewAdmin[msg.sender];
+
             require(
-                membership.viewAccess || membership.writeAccess,
-                "Caller is not a view admin"
+                // membershipRead.viewAccess || membershipWrite.viewAccess,
+                canView,
+                "Caller is not an admin"
             );
             require(
-                membership.duration == 0 ||
-                    membership.duration > block.timestamp,
+                (membershipWrite.duration == 0 ||
+                    membershipWrite.duration > block.timestamp) ||
+                    (membershipRead.duration == 0 ||
+                        membershipRead.duration > block.timestamp),
                 "Admin membership expired"
             );
+
+          // allow if write access revoked is false OR if read access revoked is false;
+          require(membershipWrite.revoked == false || membershipReadOnly.revoked == false, "Admin privilges have been revoked");
         }
         _;
     }
@@ -148,7 +166,7 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
         address to,
         string memory membershipType,
         uint256 duration
-    ) external onlyAdmin returns (uint256) {
+    ) external onlyAdmin(membershipType) returns (uint256) {
         _nextTokenId++;
 
         if (
@@ -162,14 +180,17 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
                 writeAccess: Strings.equal(membershipType, "write:admin")
                     ? true
                     : false,
-                viewAccess: Strings.equal(membershipType, "read:admin")
+                viewAccess: Strings.equal(membershipType, "read:admin") ||
+                    Strings.equal(membershipType, "write:admin")
                     ? true
                     : false,
                 duration: block.timestamp + duration,
-                isActive: true
+                revoked: true
             });
-            _addressToMembership[to] = adminMembership;
+
+            _addressToMembership[to][membershipType] = adminMembership;
             _membership[_nextTokenId] = adminMembership;
+            _onlyViewAdmin[to] = true;
 
             emit MembershipMinted(
                 _nextTokenId,
@@ -190,7 +211,7 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
                 isActive: true
             });
             _membership[_nextTokenId] = newMembership;
-            _addressToMembership[to] = newMembership;
+            _addressToMembership[to][membershipType] = newMembership;
 
             emit MembershipMinted(
                 _nextTokenId,
@@ -220,15 +241,18 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
         address admin,
         bool writeAccess,
         bool viewAccess,
-        uint256 duration
-    ) external onlyAdmin {
-        Membership memory membership = _addressToMembership[admin];
+        uint256 duration,
+        string memory membershipType
+    ) external onlyAdmin(membershipType) {
+        Membership memory membership = _addressToMembership[admin][
+            membershipType
+        ];
         require(membership.isActive, "Membership is not active");
         membership.writeAccess = writeAccess;
         membership.viewAccess = viewAccess;
         membership.duration = duration;
 
-        _addressToMembership[admin] = membership;
+        _addressToMembership[admin][membershipType] = membership;
         _membership[membership.tokenId] = membership;
         emit MembershipUpdated(
             membership.tokenId,
@@ -279,7 +303,14 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
      */
     function viewMembership(
         uint256 tokenId
-    ) public view onlyViewAdmin returns (Membership memory) {
+    )
+        public
+        view
+        returns (
+            // onlyViewAdmin
+            Membership memory
+        )
+    {
         return _membership[tokenId];
     }
 
@@ -291,8 +322,10 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
     function viewAllMemberships()
         public
         view
-        onlyViewAdmin
-        returns (Membership[] memory)
+        returns (
+            // onlyViewAdmin
+            Membership[] memory
+        )
     {
         uint256 totalSupply = totalSupply();
         Membership[] memory allMemberships = new Membership[](totalSupply);
@@ -306,18 +339,6 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
     }
 
     /**
-     * @notice Placeholder function for viewing memberships with filters
-     * @dev This function is not implemented yet
-     * @param _user The user address to filter by
-     * @param membershipType The membership type to filter by
-     * @return Array of filtered membership structs
-     */
-    function viewMembershipWithFilter(
-        address _user,
-        string memory membershipType
-    ) returns (Membership[] memory) {}
-
-    /**
      * @notice Retrieves all memberships along with their corresponding token IDs
      * @dev Only callable by view admins or owner
      * @return tokenIds Array of token IDs
@@ -326,8 +347,11 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
     function viewAllMembershipsWithTokenIds()
         public
         view
-        onlyViewAdmin
-        returns (uint256[] memory tokenIds, Membership[] memory memberships)
+        returns (
+            // onlyViewAdmin
+            uint256[] memory tokenIds,
+            Membership[] memory memberships
+        )
     {
         uint256 totalSupply = totalSupply();
         tokenIds = new uint256[](totalSupply);
