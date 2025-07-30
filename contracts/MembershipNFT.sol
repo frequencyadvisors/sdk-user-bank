@@ -38,6 +38,7 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
         Membership memory membership = _addressToMembership[msg.sender];
         require(membership.writeAccess, "Caller is not an admin");
         require(membership.expiration == 0 || membership.expiration > block.timestamp, "Admin membership expired");
+        require(!membership.revoked, "Admin membership is revoked");
         }
         _;
     }
@@ -47,6 +48,8 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
         Membership memory membership = _addressToMembership[msg.sender];
         require(membership.viewAccess || membership.writeAccess, "Caller is not a view admin");
         require(membership.expiration == 0 || membership.expiration > block.timestamp, "Admin membership expired");
+        require(!membership.revoked, "Admin membership is revoked");
+
         }
         _;
     }
@@ -195,7 +198,10 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
     */
 
     function _update(address to, uint256 tokenId, address auth) internal override(ERC721, ERC721Enumerable) returns (address) {
-        if((msg.sender == owner() || _addressToMembership[msg.sender].writeAccess) && (to == address(0) || auth == address(0))) {
+        Membership memory membership = _addressToMembership[msg.sender];
+        if((msg.sender == owner() || membership.writeAccess) && (to == address(0) || auth == address(0))) {
+        require(membership.expiration == 0 || membership.expiration > block.timestamp, "Admin membership expired");
+        require(!membership.revoked, "Admin membership is revoked");
             return super._update(to, tokenId, auth);
         } else {
             require(!_membership[tokenId].nonTransferable, "Membership is non-transferable");

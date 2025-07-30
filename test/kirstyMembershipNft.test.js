@@ -583,6 +583,7 @@ describe("RevokableMembershipNFT", function () {
             const futureTime = (await time.latest()) + 3600;
             await membershipNFT.mint(user1.address, VIP_TYPE, futureTime, false); // transferable
             await membershipNFT.mint(user2.address, PREMIUM_TYPE, futureTime, true); // non-transferable
+            await membershipNFT.mint(writeAdmin.address, WRITE_ADMIN_TYPE, futureTime, false); // transferable
         });
 
         describe("Transferable Memberships", function () {
@@ -608,6 +609,38 @@ describe("RevokableMembershipNFT", function () {
                 await membershipNFT.connect(user2).approve(user3.address, 2);
                 await expect(membershipNFT.connect(user3).transferFrom(user2.address, user3.address, 2))
                     .to.be.revertedWith("Membership is non-transferable");
+            });
+            it("Should allow owner to burn non-transferable membership", async function () {
+                await membershipNFT.connect(writeAdmin).revoke(2, true);
+                await expect(membershipNFT.ownerOf(2)).to.be.revertedWithCustomError(membershipNFT, "ERC721NonexistentToken");
+            });
+            it("should allow an admin to burn non-transferable membership", async function () {
+                await membershipNFT.revoke(2, true);
+                await expect(membershipNFT.ownerOf(2)).to.be.revertedWithCustomError(membershipNFT, "ERC721NonexistentToken");
+            });
+            it('should allow an owner or admin to mint a non-transferable membership', async function () {
+                const futureTime = (await time.latest()) + 3600;
+                await membershipNFT.mint(user3.address, PREMIUM_TYPE, futureTime, true);
+                expect(await membershipNFT.ownerOf(4)).to.equal(user3.address);
+            });
+            it('should prevent an admin from burning if their admin membership is expired', async function () {
+                const shortTime = (await time.latest()) + 100;
+                await membershipNFT.mint(writeAdmin.address, WRITE_ADMIN_TYPE, shortTime, false);
+                
+                await time.increase(200);
+                
+                await expect(membershipNFT.connect(writeAdmin).revoke(2, true))
+                    .to.be.revertedWith("Admin membership expired");
+            });
+            it('should prevent an admin from burning if their admin membership is revoked', async function () {
+                const futureTime = (await time.latest()) + 3600;
+                await membershipNFT.mint(writeAdmin.address, WRITE_ADMIN_TYPE, futureTime, false);
+                
+                // Revoke write admin
+                await membershipNFT.revoke(3, false);
+                
+                await expect(membershipNFT.connect(writeAdmin).revoke(2, true))
+                    .to.be.revertedWith("Caller is not an admin");
             });
         });
 
