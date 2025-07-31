@@ -20,13 +20,13 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
         string membershipType; // e.g. "write:admin" = write only access, "read:admin" = read only access, "vip", "premium', "silver" etc.
         bool writeAccess;
         bool viewAccess;
-        uint256 duration; // Duration in seconds, 0 means no expiration
-        bool isActive;
+        uint256 expiration; // expiration date in seconds, 0 means no expiration
+        bool revoked;
     }
 
-    event MembershipMinted(uint256 indexed tokenId, address indexed to, string membershipType, bool writeAccess, bool viewAccess, uint256 duration);
+    event MembershipMinted(uint256 indexed tokenId, address indexed to, string membershipType, bool writeAccess, bool viewAccess, uint256 expiration);
     event MembershipRevoked(uint256 indexed tokenId);
-    event MembershipUpdated(uint256 indexed tokenId, address indexed user, string membershipType, bool writeAccess, bool viewAccess, uint256 duration);
+    event MembershipUpdated(uint256 indexed tokenId, address indexed user, string membershipType, bool writeAccess, bool viewAccess, uint256 expiration);
 
 
 
@@ -35,7 +35,7 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
         if (owner() != msg.sender) {
         Membership memory membership = _addressToMembership[msg.sender];
         require(membership.writeAccess, "Caller is not an admin");
-        require(membership.duration == 0 || membership.duration > block.timestamp, "Admin membership expired");
+        require(membership.expiration == 0 || membership.expiration > block.timestamp, "Admin membership expired");
         }
         _;
     }
@@ -44,7 +44,7 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
         if (owner() != msg.sender) {
         Membership memory membership = _addressToMembership[msg.sender];
         require(membership.viewAccess || membership.writeAccess, "Caller is not a view admin");
-        require(membership.duration == 0 || membership.duration > block.timestamp, "Admin membership expired");
+        require(membership.expiration == 0 || membership.expiration > block.timestamp, "Admin membership expired");
         }
         _;
     }
@@ -57,8 +57,9 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
     {}
 
   
-    function mint(address to, string memory membershipType, uint256 duration) external onlyAdmin() returns (uint256) {
-        _nextTokenId++;
+    function mint(address to, string memory membershipType, uint256 expiration) external onlyAdmin() returns (uint256) {
+        require(expiration == 0 || expiration > block.timestamp, "Expiration must be in the future or 0 if no expiration");
+        _nextTokenId++; 
 
        if (Strings.equal(membershipType, 'write:admin') || Strings.equal(membershipType, 'read:admin')) {
         Membership memory adminMembership = Membership({
@@ -67,13 +68,13 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
             membershipType: membershipType,
             writeAccess: Strings.equal(membershipType, 'write:admin') ? true : false,
             viewAccess: Strings.equal(membershipType, 'read:admin') ? true : false,
-            duration: block.timestamp + duration,
-            isActive: true
+            expiration: expiration,
+            revoked: false
         });
         _addressToMembership[to] = adminMembership;
         _membership[_nextTokenId] = adminMembership;
-
-        emit MembershipMinted(_nextTokenId, to, membershipType, adminMembership.writeAccess, adminMembership.viewAccess, adminMembership.duration);
+        
+        emit MembershipMinted(_nextTokenId, to, membershipType, adminMembership.writeAccess, adminMembership.viewAccess, adminMembership.expiration);
        } else { 
         // user only memberships 
         Membership memory newMembership = Membership({
@@ -82,31 +83,30 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
             membershipType: membershipType, // e.g, "vip", "premium", "silver"
             writeAccess: false,
             viewAccess: false,
-            duration: block.timestamp + duration,
-            isActive: true
+            expiration: expiration,
+            revoked: false
         });
         _membership[_nextTokenId] = newMembership;
         _addressToMembership[to] = newMembership;
         
-        emit MembershipMinted(_nextTokenId, to, membershipType, newMembership.writeAccess, newMembership.viewAccess, newMembership.duration);
+        emit MembershipMinted(_nextTokenId, to, membershipType, newMembership.writeAccess, newMembership.viewAccess, newMembership.expiration);
        } 
 
-        _nextTokenId++;
         _safeMint(to, _nextTokenId);
 
         return _nextTokenId;
     }
 
-    function updateAdmin(address admin, bool writeAccess, bool viewAccess, uint256 duration) external onlyAdmin {
+    function updateAdmin(address admin, bool writeAccess, bool viewAccess, uint256 expiration) external onlyAdmin {
         Membership memory membership = _addressToMembership[admin];
-        require(membership.isActive, "Membership is not active");
+        require(!membership.revoked, "Membership is revoked");
         membership.writeAccess = writeAccess;
         membership.viewAccess = viewAccess;
-        membership.duration = duration;
+        membership.expiration = expiration;
 
         _addressToMembership[admin] = membership;
         _membership[membership.tokenId] = membership;
-        emit MembershipUpdated(membership.tokenId, admin, membership.membershipType, writeAccess, viewAccess, duration);
+        emit MembershipUpdated(membership.tokenId, admin, membership.membershipType, writeAccess, viewAccess, expiration);
     }
 
     // if hard delete is true, the token will be burned and removed from the mapping
@@ -131,8 +131,8 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
         }
 
         if (!hardDelete) {
-            require(membership.isActive, "Membership already revoked");
-            membership.isActive = false; // Mark membership as inactive and do not burn the token
+            require(!membership.revoked, "Membership already revoked");
+            membership.revoked = true; // Mark membership as revoked and do not burn the token
 
             emit MembershipRevoked(tokenId);
         }
