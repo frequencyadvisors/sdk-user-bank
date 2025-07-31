@@ -26,9 +26,9 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
         bool nonTransferable; // if true, the membership cannot be transferred 
     }
 
-    event MembershipMinted(uint256 indexed tokenId, address indexed to, string membershipType, bool writeAccess, bool viewAccess, uint256 expiration);
+    event MembershipMinted(uint256 indexed tokenId, address indexed to, string membershipType, bool writeAccess, bool viewAccess, uint256 expiration, bool nonTransferable);
     event MembershipRevoked(uint256 indexed tokenId);
-    event MembershipUpdated(uint256 indexed tokenId, address indexed user, string membershipType, bool writeAccess, bool viewAccess, uint256 expiration);
+    event MembershipUpdated(uint256 indexed tokenId, address indexed user, string membershipType, bool writeAccess, bool viewAccess, uint256 expiration, bool nonTransferable);
 
 
 
@@ -79,7 +79,7 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
         });
         _addressToMembership[to] = adminMembership;
         _membership[_nextTokenId] = adminMembership;
-        emit MembershipMinted(_nextTokenId, to, membershipType, adminMembership.writeAccess, adminMembership.viewAccess, adminMembership.expiration);
+        emit MembershipMinted(_nextTokenId, to, membershipType, adminMembership.writeAccess, adminMembership.viewAccess, adminMembership.expiration, adminMembership.nonTransferable);
        } else { 
         // user only memberships 
         Membership memory newMembership = Membership({
@@ -95,7 +95,7 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
         _membership[_nextTokenId] = newMembership;
         _addressToMembership[to] = newMembership;
         
-        emit MembershipMinted(_nextTokenId, to, membershipType, newMembership.writeAccess, newMembership.viewAccess, newMembership.expiration);
+        emit MembershipMinted(_nextTokenId, to, membershipType, newMembership.writeAccess, newMembership.viewAccess, newMembership.expiration, newMembership.nonTransferable);
        } 
 
         _safeMint(to, _nextTokenId);
@@ -103,7 +103,7 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
         return _nextTokenId;
     }
 
-    function updateAdmin(address admin, bool writeAccess, bool viewAccess, uint256 expiration) external onlyAdmin {
+    function updateAdmin(address admin, bool writeAccess, bool viewAccess, uint256 expiration, bool nonTransferable) external onlyAdmin {
         Membership storage membership = _addressToMembership[admin];
         require(membership.user != address(0), "Admin does not exist");
         require(!membership.revoked, "Membership is revoked");
@@ -111,9 +111,10 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
         membership.writeAccess = writeAccess;
         membership.viewAccess = viewAccess;
         membership.expiration = expiration;
+        membership.nonTransferable = nonTransferable; 
 
         _membership[membership.tokenId] = membership;
-        emit MembershipUpdated(membership.tokenId, admin, membership.membershipType, writeAccess, viewAccess, expiration);
+        emit MembershipUpdated(membership.tokenId, admin, membership.membershipType, writeAccess, viewAccess, expiration, nonTransferable);
     }
     /**
      * @dev Handles the deletion of a membership NFT.
