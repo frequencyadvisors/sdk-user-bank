@@ -1,8 +1,11 @@
 require("@nomicfoundation/hardhat-toolbox");
 require("@openzeppelin/hardhat-upgrades");
 require("dotenv").config({ path: ".env" });
+require("hardhat-contract-sizer")
+
 
 module.exports = {
+
   solidity: { 
     version: "0.8.22",
   settings: {
@@ -28,5 +31,11 @@ module.exports = {
         chainId: 53716,
         accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
     }
+  },
+  contractSizer: {
+    alphaSort: true,
+    disambiguatePaths: false,
+    runOnCompile: false,
+    strict: true,
   }
 };
