@@ -23,7 +23,7 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
     mapping(address => mapping(string => Membership))
         private _addressToMembership;
 
-    mapping(address => bool) private _onlyViewAdmin;
+    // mapping(address => bool) private _onlyViewAdmin;
 
     /**
      * @notice Represents a membership with various access levels and properties
@@ -39,6 +39,7 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
         uint256 tokenId;
         address user;
         string membershipType; // e.g. "write:admin" = write only access, "read:admin" = read only access, "vip", "premium', "silver" etc.
+        bool isAdmin; // true when write:admin | read:admin == true
         bool writeAccess;
         bool viewAccess;
         uint256 expiration; // expiration date in seconds, 0 means no expiration
@@ -96,7 +97,11 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
             Membership memory membership = _addressToMembership[msg.sender][
                 membershipType
             ];
-            require(membership.writeAccess, "Caller is not an admin");
+            require(membership.isAdmin, "Caller is not an admin");
+            require(
+                membership.writeAccess,
+                "Caller does not have write access"
+            );
             require(
                 membership.expiration == 0 ||
                     membership.expiration > block.timestamp,
@@ -122,13 +127,11 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
             Membership memory membershipReadOnly = _addressToMembership[
                 msg.sender
             ]["read:admin"];
-            bool canView = _onlyViewAdmin[msg.sender];
-
             require(
-                // membershipRead.viewAccess || membershipWrite.viewAccess,
-                canView,
+                membershipWrite.isAdmin || membershipReadOnly.isAdmin,
                 "Caller is not an admin"
             );
+
             require(
                 membershipWrite.expiration == 0 ||
                     membershipWrite.expiration > block.timestamp,
@@ -147,8 +150,6 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
                     membershipReadOnly.revoked == false,
                 "Admin privilges have been revoked"
             );
-
-            
         }
         _;
     }
@@ -185,6 +186,7 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
             expiration == 0 || expiration > block.timestamp,
             "Expiration must be in the future or 0 if no expiration"
         );
+
         _nextTokenId++;
 
         if (
@@ -195,6 +197,7 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
                 tokenId: _nextTokenId,
                 user: to,
                 membershipType: membershipType,
+                isAdmin: true,
                 writeAccess: Strings.equal(membershipType, "write:admin")
                     ? true
                     : false,
@@ -208,7 +211,7 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
 
             _addressToMembership[to][membershipType] = adminMembership;
             _membership[_nextTokenId] = adminMembership;
-            _onlyViewAdmin[to] = true;
+            // _onlyViewAdmin[to] = true;
 
             emit MembershipMinted(
                 _nextTokenId,
@@ -223,6 +226,7 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
                 tokenId: _nextTokenId,
                 user: to,
                 membershipType: membershipType,
+                isAdmin: false,
                 writeAccess: false,
                 viewAccess: false,
                 expiration: expiration,
@@ -266,6 +270,8 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
             membershipType
         ];
         require(!membership.revoked, "Membership is revoked");
+        bool isAdmin = writeAccess == true || viewAccess == true ? true : false;
+        membership.isAdmin = isAdmin;
         membership.writeAccess = writeAccess;
         membership.viewAccess = viewAccess;
         membership.expiration = expiration;
@@ -299,21 +305,25 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
             _burn(tokenId);
             delete _membership[tokenId];
             emit MembershipRevoked(tokenId);
-        } else {}
+        } else {
+            if (membership.isAdmin) {
+                membership.isAdmin = false; // Remove admin status if the user is an admin
+            }
 
-        if (membership.writeAccess) {
-            membership.writeAccess = false; // Remove admin status if the user is an admin
-        }
+            if (membership.writeAccess) {
+                membership.writeAccess = false; // Remove admin status if the user is an admin
+            }
 
-        if (membership.viewAccess) {
-            membership.viewAccess = false; // Remove view admin status if the user is a view admin
-        }
+            if (membership.viewAccess) {
+                membership.viewAccess = false; // Remove view admin status if the user is a view admin
+            }
 
-        if (!hardDelete) {
-            require(!membership.revoked, "Membership already revoked");
-            membership.revoked = true; // Mark membership as revoked and do not burn the token
+            if (!hardDelete) {
+                require(!membership.revoked, "Membership already revoked");
+                membership.revoked = true; // Mark membership as revoked and do not burn the token
 
-            emit MembershipRevoked(tokenId);
+                emit MembershipRevoked(tokenId);
+            }
         }
     }
 
@@ -326,7 +336,6 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
     function viewMembership(
         uint256 tokenId
     ) public view onlyViewAdmin returns (Membership memory) {
-
         return _membership[tokenId];
     }
 
