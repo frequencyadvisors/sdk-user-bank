@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 /**
  * @title RevokableMembershipNFT
@@ -44,6 +45,7 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
         bool viewAccess;
         uint256 expiration; // expiration date in seconds, 0 means no expiration
         bool revoked;
+        bool nonTransferable; // if true, the membership cannot be transferred 
     }
 
     /**
@@ -111,6 +113,7 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
                 membership.revoked == false,
                 "Admin privileges have been revoked"
             );
+
         }
         _;
     }
@@ -168,6 +171,7 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
         ERC721Burnable()
         Ownable(msg.sender)
     {}
+
 
     /**
      * @notice Mints a new membership NFT to the specified address
@@ -245,10 +249,12 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
             );
         }
 
+
         _safeMint(to, _nextTokenId);
 
         return _nextTokenId;
     }
+
 
     /**
      * @notice Updates the access permissions and expiration of an existing admin membership. Membership type is not changed, only privileges are!
@@ -272,11 +278,12 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
         require(!membership.revoked, "Membership is revoked");
         bool isAdmin = writeAccess == true || viewAccess == true ? true : false;
         membership.isAdmin = isAdmin;
+
         membership.writeAccess = writeAccess;
         membership.viewAccess = viewAccess;
         membership.expiration = expiration;
-
         _addressToMembership[admin][membershipType] = membership;
+
         _membership[membership.tokenId] = membership;
         emit MembershipUpdated(
             membership.tokenId,
@@ -287,6 +294,7 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
             expiration
         );
     }
+
 
     /**
      * @notice Revokes a membership either by burning the token or marking it inactive. The revoked Id gets nullified, but nextTokenId is unaffected.
@@ -326,6 +334,7 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
             }
         }
     }
+}
 
     /**
      * @notice Retrieves membership information for a specific token ID
@@ -406,18 +415,29 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
         super._increaseBalance(account, value);
     }
 
+
+    function ownerOf(uint256 tokenId) public view override(ERC721, IERC721) onlyViewAdmin returns (address) {
+    return super.ownerOf(tokenId);
+    }
+
     /**
-     * @dev Internal function to update token ownership, required for ERC721Enumerable
-     * @param to The new owner of the token
-     * @param tokenId The ID of the token being transferred
-     * @param auth The address authorized to make the transfer
-     * @return The previous owner of the token
-     */
-    function _update(
-        address to,
-        uint256 tokenId,
-        address auth
-    ) internal override(ERC721, ERC721Enumerable) returns (address) {
+        * @dev See {ERC721-_update}.
+        * This function is overridden to ensure that the transfer logic is compatible with the enumerable extension.
+        * It allows for the transfer of tokens while maintaining the enumerable state.
+        * Transfer should take place if it is a mint or burn, and the caller should be the owner or admin.
+        * If the caller is not an owner or adminer, check if the membership is non-transferable
+    */
+
+    function _update(address to, uint256 tokenId, address auth) internal override(ERC721, ERC721Enumerable) returns (address) {
+        Membership memory membership = _addressToMembership[msg.sender];
+        if((msg.sender == owner() || membership.writeAccess) && (to == address(0) || auth == address(0))) {
+        require(membership.expiration == 0 || membership.expiration > block.timestamp, "Admin membership expired");
+        require(!membership.revoked, "Admin membership is revoked");
+            return super._update(to, tokenId, auth);
+        } else {
+            require(!_membership[tokenId].nonTransferable, "Membership is non-transferable");
+
+        }
         return super._update(to, tokenId, auth);
     }
 

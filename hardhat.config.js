@@ -5,15 +5,15 @@ require("hardhat-contract-sizer")
 
 
 module.exports = {
-  solidity: {
+
+  solidity: { 
     version: "0.8.22",
-    settings: {
-      optimizer: {
-        enabled: true,
-        runs: 200
+  settings: {
+    optimizer: {
+      enabled: true,
+      runs: 200,
       },
-      viaIR: true
-    }
+    },
   },
   networks: {
     hardhat: {},
