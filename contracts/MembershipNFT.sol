@@ -334,7 +334,7 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
             }
         }
     }
-}
+
 
     /**
      * @notice Retrieves membership information for a specific token ID
@@ -417,7 +417,7 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
 
 
     function ownerOf(uint256 tokenId) public view override(ERC721, IERC721) onlyViewAdmin returns (address) {
-    return super.ownerOf(tokenId);
+        return super.ownerOf(tokenId);
     }
 
     /**
