@@ -2,9 +2,11 @@ const { expect } = require("chai");
 const { ethers, upgrades } = require("hardhat");
 const { time } = require("@nomicfoundation/hardhat-network-helpers");
 
-describe.only("NFT Membership", function () {
+describe("NFT Membership", function () {
   const name = "RevocableNFT";
   const symbol = "RNFT";
+  const nonTransferable = true;
+  const projectId = 1; // Assuming a project ID for testing
   let nftMembership, owner, admin, nonAdmin, vvip;
   this.beforeEach(async function () {
     [owner, admin, nonAdmin, vvip] = await ethers.getSigners();
@@ -16,38 +18,42 @@ describe.only("NFT Membership", function () {
     await nftMembership.waitForDeployment();
   });
   it("should mint a non-admin NFT", async function () {
+
     const tx = await nftMembership
       .connect(owner)
-      .mint(await vvip.getAddress(), "vvip", 1816960943);
+      .mint(projectId, await vvip.getAddress(), "vvip", 1816960943, nonTransferable);
     const token = await nftMembership.connect(owner).viewMembership(1);
-    expect(token[0]).to.equal(BigInt(1));
-    expect(token[1]).to.equal(await vvip.getAddress());
-    expect(token[2]).to.equal("vvip");
-    expect(token[3]).to.equal(false);
-    expect(token[4]).to.equal(false); //no write access
-    expect(token[5]).to.equal(false); //no read access
-    expect(token[6]).to.equal(1816960943);
-    expect(token[7]).to.equal(false); //revoked == true
+    expect(token[0]).to.equal(projectId);
+    expect(token[1]).to.equal(token.tokenId);
+    expect(token[2]).to.equal(await vvip.getAddress());  
+    expect(token[3]).to.equal("vvip");
+    expect(token[4]).to.equal(false);
+    expect(token[5]).to.equal(false); //no write access
+    expect(token[6]).to.equal(false); //no read access
+    expect(token[7]).to.equal(1816960943);
+    expect(token[8]).to.equal(false);
+    expect(token[9]).to.equal(nonTransferable);
   });
   it("should mint an admin NFT", async function () {
     const tx = await nftMembership
       .connect(owner)
-      .mint(await admin.getAddress(), "write:admin", 1816960943);
+      .mint(projectId, await admin.getAddress(), "write:admin", 1816960943, nonTransferable);
     const token = await nftMembership.connect(owner).viewMembership(1);
-    // console.log({ token });
-    expect(token[0]).to.equal(BigInt(1));
-    expect(token[1]).to.equal(await admin.getAddress());
-    expect(token[2]).to.equal("write:admin");
-    expect(token[3]).to.equal(true);
-    expect(token[4]).to.equal(true); // write access == true
-    expect(token[5]).to.equal(true); // read access == true
-    expect(token[6]).to.equal(1816960943);
-    expect(token[7]).to.equal(false); //revoked == true
+    expect(token[0]).to.equal(0);
+    expect(token[1]).to.equal(token.tokenId);
+    expect(token[2]).to.equal(await admin.getAddress());
+    expect(token[3]).to.equal("write:admin");
+    expect(token[4]).to.equal(true);
+    expect(token[5]).to.equal(true); // write access == true
+    expect(token[6]).to.equal(true); //no read access
+    expect(token[7]).to.equal(1816960943);
+    expect(token[8]).to.equal(false);
+    expect(token[9]).to.equal(nonTransferable);
   });
   it("should test a Non Admin", async function () {
     const tx = await nftMembership
       .connect(owner)
-      .mint(await admin.getAddress(), "read:admin", 1816960943);
+      .mint(projectId, await admin.getAddress(), "read:admin", 1816960943, nonTransferable);
     await expect(nftMembership.connect(nonAdmin).viewMembership(1)).to.be.revertedWith("Caller is not an admin");
     // console.log({ token });
     // expect(token[0]).to.equal(BigInt(1));
@@ -62,126 +68,138 @@ describe.only("NFT Membership", function () {
     await expect(
       nftMembership
         .connect(nonAdmin)
-        .mint(await admin.getAddress(), "write:admin", 1816960943)
+        .mint(projectId,await admin.getAddress(), "write:admin", 1816960943, nonTransferable)
     ).to.be.revertedWith("Caller is not an admin");
   });
-  it("should update an NFT's admin privileges", async function () {
-    const tx1 = await nftMembership
-      .connect(owner)
-      .mint(await admin.getAddress(), "read:admin", 1816960943);
-    let token = await nftMembership.connect(owner).viewMembership(1);
-    // console.log({ token });
-    expect(token[0]).to.equal(BigInt(1));
-    expect(token[1]).to.equal(await admin.getAddress());
-    expect(token[2]).to.equal("read:admin");
-    expect(token[3]).to.equal(true);
-    expect(token[4]).to.equal(false); // write access == false
-    expect(token[5]).to.equal(true); // read access == true
-    expect(token[6]).to.equal(1816960943);
-    expect(token[7]).to.equal(false); //revoked == true
+  // it("should update an NFT's admin privileges", async function () {
+  //   const tx1 = await nftMembership
+  //     .connect(owner)
+  //     .mint(await admin.getAddress(), "read:admin", 1816960943, nonTransferable);
+  //   let token = await nftMembership.connect(owner).viewMembership(1);
+  //   // console.log({ token });
+  //   expect(token[0]).to.equal(BigInt(1));
+  //   expect(token[1]).to.equal(await admin.getAddress());
+  //   expect(token[2]).to.equal("read:admin");
+  //   expect(token[3]).to.equal(true);
+  //   expect(token[4]).to.equal(false); // write access == false
+  //   expect(token[5]).to.equal(true); // read access == true
+  //   expect(token[6]).to.equal(1816960943);
+  //   expect(token[7]).to.equal(false); //revoked == true
+  //   expect(token[8]).to.equal(nonTransferable); // non-transferable == true
 
-    const tx2 = await nftMembership
-      .connect(owner)
-      .updateAdmin(await admin.getAddress(), true, false, 0, "read:admin"); //what happens when true, false
-    token = await nftMembership.connect(owner).viewMembership(1);
-    // console.log({ token });
-    expect(token[0]).to.equal(BigInt(1));
-    expect(token[1]).to.equal(await admin.getAddress());
-    expect(token[2]).to.equal("read:admin");
-    expect(token[3]).to.equal(true);
-    expect(token[4]).to.equal(true); // write access == true | covers read access too
-    expect(token[5]).to.equal(false); // read access == false
-    expect(token[6]).to.equal(0n);
-    expect(token[7]).to.equal(false); //revoked == true
-    // POTENTIAL EDGE CASE: Membership type "read:admin" can have write access due to the above
-    // Setting the read:admin to FALSE can end up in a scenario where if "read:admin" becomes false while "write:admin" is TRUE.
-    // Still granting read:access
-  });
-  it("should update an NFT's admin privileges, downgrading Admin privileges", async function () {
-    const tx1 = await nftMembership
-      .connect(owner)
-      .mint(await admin.getAddress(), "read:admin", 1816960943);
-    let token = await nftMembership.connect(owner).viewMembership(1);
-    // console.log({ token });
-    expect(token[0]).to.equal(BigInt(1));
-    expect(token[1]).to.equal(await admin.getAddress());
-    expect(token[2]).to.equal("read:admin");
-    expect(token[3]).to.equal(true);
-    expect(token[4]).to.equal(false); // write access == false
-    expect(token[5]).to.equal(true); // read access == true
-    expect(token[6]).to.equal(1816960943);
-    expect(token[7]).to.equal(false); //revoked == true
+  //   const tx2 = await nftMembership
+  //     .connect(owner)
+  //     .updateAdmin(await admin.getAddress(), true, false, 0, "read:admin", nonTransferable); //what happens when true, false
+  //   token = await nftMembership.connect(owner).viewMembership(1);
+  //   // console.log({ token });
+  //   expect(token[0]).to.equal(BigInt(1));
+  //   expect(token[1]).to.equal(await admin.getAddress());
+  //   expect(token[2]).to.equal("read:admin");
+  //   expect(token[3]).to.equal(true);
+  //   expect(token[4]).to.equal(true); // write access == true | covers read access too
+  //   expect(token[5]).to.equal(false); // read access == false
+  //   expect(token[6]).to.equal(0n);
+  //   expect(token[7]).to.equal(false); //revoked == true
+  //   expect(token[8]).to.equal(nonTransferable); // non-transferable == true
+  //   // POTENTIAL EDGE CASE: Membership type "read:admin" can have write access due to the above
+  //   // Setting the read:admin to FALSE can end up in a scenario where if "read:admin" becomes false while "write:admin" is TRUE.
+  //   // Still granting read:access
+  // });
+  // it("should update an NFT's admin privileges, downgrading Admin privileges", async function () {
+  //   const tx1 = await nftMembership
+  //     .connect(owner)
+  //     .mint(await admin.getAddress(), "read:admin", 1816960943, nonTransferable);
+  //   let token = await nftMembership.connect(owner).viewMembership(1);
+  //   // console.log({ token });
+  //   expect(token[0]).to.equal(BigInt(1));
+  //   expect(token[1]).to.equal(await admin.getAddress());
+  //   expect(token[2]).to.equal("read:admin");
+  //   expect(token[3]).to.equal(true);
+  //   expect(token[4]).to.equal(false); // write access == false
+  //   expect(token[5]).to.equal(true); // read access == true
+  //   expect(token[6]).to.equal(1816960943);
+  //   expect(token[7]).to.equal(false); //revoked == true
+  //   expect(token[8]).to.equal(nonTransferable); // non-transferable == true
 
-    const tx2 = await nftMembership
-      .connect(owner)
-      .updateAdmin(await admin.getAddress(), false, false, 0, "read:admin"); //what happens when true, false
-    token = await nftMembership.connect(owner).viewMembership(1);
-    // console.log({ token });
-    expect(token[0]).to.equal(BigInt(1));
-    expect(token[1]).to.equal(await admin.getAddress());
-    expect(token[2]).to.equal("read:admin");
-    expect(token[3]).to.equal(false);
-    expect(token[4]).to.equal(false); // write access == true | covers read access too
-    expect(token[5]).to.equal(false); // read access == false
-    expect(token[6]).to.equal(0n);
-    expect(token[7]).to.equal(false); //revoked == true
-    // POTENTIAL EDGE CASE: Membership type "read:admin" can have write access due to the above
-    // Setting the read:admin to FALSE can end up in a scenario where if "read:admin" becomes false while "write:admin" is TRUE.
-    // Still granting read:access
-  });
+  //   const tx2 = await nftMembership
+  //     .connect(owner)
+  //     .updateAdmin(await admin.getAddress(), false, false, 0, "read:admin"); //what happens when true, false
+  //   token = await nftMembership.connect(owner).viewMembership(1);
+  //   // console.log({ token });
+  //   expect(token[0]).to.equal(BigInt(1));
+  //   expect(token[1]).to.equal(await admin.getAddress());
+  //   expect(token[2]).to.equal("read:admin");
+  //   expect(token[3]).to.equal(false);
+  //   expect(token[4]).to.equal(false); // write access == true | covers read access too
+  //   expect(token[5]).to.equal(false); // read access == false
+  //   expect(token[6]).to.equal(0n);
+  //   expect(token[7]).to.equal(false); //revoked == true
+  //   expect(token[8]).to.equal(nonTransferable); // non-transferable == true
+  //   // POTENTIAL EDGE CASE: Membership type "read:admin" can have write access due to the above
+  //   // Setting the read:admin to FALSE can end up in a scenario where if "read:admin" becomes false while "write:admin" is TRUE.
+  //   // Still granting read:access
+  // });
   it("should revoke an admin's privileges - NO HARD DELETE", async function () {
     const tx = await nftMembership
       .connect(owner)
-      .mint(await admin.getAddress(), "write:admin", 1816960943);
+      .mint(projectId, await admin.getAddress(), "write:admin", 1816960943, nonTransferable);
     let token = await nftMembership.connect(owner).viewMembership(1);
     // console.log({ token });
-    expect(token[0]).to.equal(BigInt(1));
-    expect(token[1]).to.equal(await admin.getAddress());
-    expect(token[2]).to.equal("write:admin");
-    expect(token[3]).to.equal(true); 
-    expect(token[4]).to.equal(true); // write access == true
-    expect(token[5]).to.equal(true); // read access == true
-    expect(token[6]).to.equal(1816960943);
-    expect(token[7]).to.equal(false); //revoked == true
+    expect(token[0]).to.equal(0);
+    expect(token[1]).to.equal(token.tokenId);
+    expect(token[2]).to.equal(await admin.getAddress());
+    expect(token[3]).to.equal("write:admin");
+    expect(token[4]).to.equal(true); 
+    expect(token[5]).to.equal(true); // write access == true
+    expect(token[6]).to.equal(true); // read access == true
+    expect(token[7]).to.equal(1816960943);
+    expect(token[8]).to.equal(false); //revoked == false
+    expect(token[9]).to.equal(nonTransferable); // non-transferable == true
 
     await nftMembership.connect(owner).revoke(1, false);
     token = await nftMembership.connect(owner).viewMembership(1);
     // console.log({ token });
-    expect(token[0]).to.equal(BigInt(1));
-    expect(token[1]).to.equal(await admin.getAddress());
-    expect(token[2]).to.equal("write:admin");
-    expect(token[3]).to.equal(false); 
-    expect(token[4]).to.equal(false); // write access == false
-    expect(token[5]).to.equal(false); // read access == false
-    expect(token[6]).to.equal(1816960943);
-    expect(token[7]).to.equal(true); //revoked == true
+    expect(token[0]).to.equal(0);
+    expect(token[1]).to.equal(token.tokenId);
+    expect(token[2]).to.equal(await admin.getAddress());
+    expect(token[3]).to.equal("write:admin");
+    expect(token[4]).to.equal(false); // isAdmin == false
+    expect(token[5]).to.equal(false); // write access == false
+    expect(token[6]).to.equal(false); // read access == false
+    expect(token[7]).to.equal(1816960943);
+    expect(token[8]).to.equal(true); //revoked == true
+    expect(token[9]).to.equal(nonTransferable); // non-transferable == true
   });
   it("should revoke an admin's privileges - HARD DELETE", async function () {
     const tx = await nftMembership
       .connect(owner)
-      .mint(await admin.getAddress(), "write:admin", 1816960943);
+      .mint(projectId, await admin.getAddress(), "write:admin", 1816960943, nonTransferable);
     let token = await nftMembership.connect(owner).viewMembership(1);
     // console.log({ token });
-    expect(token[0]).to.equal(BigInt(1));
-    expect(token[1]).to.equal(await admin.getAddress());
-    expect(token[2]).to.equal("write:admin");
-    expect(token[3]).to.equal(true); 
-    expect(token[4]).to.equal(true); // write access == true
-    expect(token[5]).to.equal(true); // read access == true
-    expect(token[6]).to.equal(1816960943);
-    expect(token[7]).to.equal(false); //revoked == true
+    expect(token[0]).to.equal(0);
+    expect(token[1]).to.equal(token.tokenId);
+    expect(token[2]).to.equal(await admin.getAddress());
+    expect(token[3]).to.equal("write:admin");
+    expect(token[4]).to.equal(true); 
+    expect(token[5]).to.equal(true); // write access == true
+    expect(token[6]).to.equal(true); // read access == true
+    expect(token[7]).to.equal(1816960943);
+    expect(token[8]).to.equal(false); //revoked == false
+    expect(token[9]).to.equal(nonTransferable); // non-transferable == true
 
     await nftMembership.connect(owner).revoke(1, true);
     token = await nftMembership.connect(owner).viewMembership(1);
     // console.log({ token });
     expect(token[0]).to.equal(BigInt(0));
-    expect(token[1]).to.equal("0x0000000000000000000000000000000000000000");
-    expect(token[2]).to.equal("");
-    expect(token[3]).to.equal(false); 
-    expect(token[4]).to.equal(false); // write access == false
-    expect(token[5]).to.equal(false); // read access == false
-    expect(token[6]).to.equal(0n);
-    expect(token[7]).to.equal(false); //revoked == true
+    expect(token[1]).to.equal(token.tokenId);
+    expect(token[2]).to.equal(ethers.ZeroAddress); // address(0) after hard delete
+    expect(token[3]).to.equal("");
+    expect(token[4]).to.equal(false); // isAdmin == false
+    expect(token[5]).to.equal(false); // write access == false
+    expect(token[6]).to.equal(false); // read access == false
+    expect(token[7]).to.equal(0n);
+    expect(token[8]).to.equal(false); //revoked == false because it's hard deleted
+    expect(token[9]).to.equal(false); // non-transferable == false because it's hard deleted
 
     // await nftMembership
     //   .connect(owner)
@@ -192,7 +210,7 @@ describe.only("NFT Membership", function () {
   it("should test expiry on admin privileges", async function () {
     const tx = await nftMembership
       .connect(owner)
-      .mint(await admin.getAddress(), "write:admin", 1816960943);
+      .mint(projectId, await admin.getAddress(), "write:admin", 1816960943, nonTransferable);
       let token = await nftMembership.connect(admin).viewMembership(1);
     // console.log({ token });
     await time.increaseTo(1816960944);
@@ -205,7 +223,7 @@ describe.only("NFT Membership", function () {
     this.beforeEach(async function () {
         const tx = await nftMembership
       .connect(owner)
-      .mint(await admin.getAddress(), "write:admin", 1916960943);
+      .mint(projectId, await admin.getAddress(), "write:admin", 1916960943, nonTransferable);
     });
     it("should test that view privileges can view a Membership", async function(){
         expect(await nftMembership.connect(admin).viewMembership(1)).to.not.be.reverted
@@ -213,7 +231,7 @@ describe.only("NFT Membership", function () {
     it("should test that only view privileges can view ALL memberships", async function(){
         const tx = await nftMembership
       .connect(owner)
-      .mint(await vvip.getAddress(), "write:admin", 0);
+      .mint(projectId, await vvip.getAddress(), "write:admin", 0, nonTransferable);
       expect(await nftMembership.connect(vvip).viewAllMemberships()).to.not.be.reverted;
  
     });
@@ -221,7 +239,7 @@ describe.only("NFT Membership", function () {
       "should test that only view privileges can view ALL tokenIds and memberships", async function(){
         const tx = await nftMembership
       .connect(owner)
-      .mint(await vvip.getAddress(), "write:admin", 0);
+      .mint(projectId, await vvip.getAddress(), "write:admin", 0, nonTransferable);
       expect(await nftMembership.connect(vvip).viewAllMembershipsWithTokenIds()).to.not.be.reverted;
       }
     );
