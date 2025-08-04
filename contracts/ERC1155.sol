@@ -22,7 +22,6 @@ contract SimpleERC1155 is ERC1155, Ownable {
         uint256 amount;
         uint256 expiration;
         bool nonTransferable; 
-        string uri;
     }
 
     event ERC1155Minted(address indexed to, uint256 indexed id, uint256 amount, uint256 expiration, bool nonTransferable, string uri, bytes data);
@@ -52,8 +51,7 @@ contract SimpleERC1155 is ERC1155, Ownable {
             user: to,
             amount: amount,
             expiration: expiration,
-            nonTransferable: nonTransferable,
-            uri: uri(id)
+            nonTransferable: nonTransferable
         });
         _tokenMetadata[id][to] = metadata;
     }
@@ -75,8 +73,6 @@ contract SimpleERC1155 is ERC1155, Ownable {
                 _tokenMetadata[ids[i]][to].id = ids[i];
                 _tokenMetadata[ids[i]][to].expiration = _tokenMetadata[ids[i]][from].expiration;
                 _tokenMetadata[ids[i]][to].nonTransferable = _tokenMetadata[ids[i]][from].nonTransferable;
-                _tokenMetadata[ids[i]][to].uri = uri(ids[i]);
-
                 // Update the amount in the sender's metadata
                 _tokenMetadata[ids[i]][from].amount -= values[i];
             }
