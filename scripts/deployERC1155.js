@@ -5,7 +5,7 @@ async function main() {
     const uri = "https://example.com/api/{id}.json";
     const contract = await SimpleERC1155.deploy(uri);
     await contract.waitForDeployment();
-    console.log("SimpleERC1155 deployed to:", contract);
+    console.log("SimpleERC1155 deployed to:", await contract.getAddress());
 }
 
 main().catch((error) => {
