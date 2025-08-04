@@ -25,7 +25,7 @@ contract SimpleERC1155 is ERC1155, Ownable {
         string uri;
     }
 
-    event TokenMinted(address indexed to, uint256 indexed id, uint256 amount, uint256 expiration, bool nonTransferable, string uri, bytes data);
+    event ERC1155Minted(address indexed to, uint256 indexed id, uint256 amount, uint256 expiration, bool nonTransferable, string uri, bytes data);
 
     constructor(string memory uri) ERC1155(uri) Ownable(msg.sender) {
         _setURI(uri);
@@ -39,6 +39,7 @@ contract SimpleERC1155 is ERC1155, Ownable {
         require(id > 0, "Token ID must be greater than zero");
         _setTokenMetadata(to, id, amount, expiration, nonTransferable);
         _mint(to, id, amount, data);
+        emit ERC1155Minted(to, id, amount, expiration, nonTransferable, uri(id), data);
     }
 
     function getMetatadata(uint256 id, address user) public view returns (Metadata memory) {
