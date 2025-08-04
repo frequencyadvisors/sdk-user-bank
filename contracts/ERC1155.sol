@@ -84,47 +84,4 @@ contract SimpleERC1155 is ERC1155, Ownable {
         }
 
     }
-
-    function getMetatadata(uint256 id, address user) public view returns (Metadata memory) {
-        return _tokenMetadata[id][user];
-    }
-
-    function _setTokenMetadata(address to, uint256 id, uint256 amount, uint256 expiration, bool nonTransferable) internal {
-        Metadata memory metadata = Metadata({
-            id: id,
-            user: to,
-            amount: amount,
-            expiration: expiration,
-            nonTransferable: nonTransferable,
-            uri: uri(id)
-        });
-        _tokenMetadata[id][to] = metadata;
-    }
-    
-    function _update(address from, address to, uint256[] memory ids, uint256[] memory values) internal override(ERC1155) {
-        require(ids.length > 0, "ERC1155: ids is empty");
-        require(values.length > 0, "ERC1155: amount is empty");
-        require(ids.length == values.length, "ERC1155: ids and values length mismatch");
-        if (msg.sender == owner() &&  (from == address(0) || to == address(0))) {
-            super._update(from, to, ids, values);
-        } else {
-            for (uint256 i = 0; i < ids.length; ++i) {
-                require(!_tokenMetadata[ids[i]][from].nonTransferable, "ERC1155 is non-transferable");
-                super._update(from, to, ids, values);
-
-                // update metadata for the token being transferred
-                _tokenMetadata[ids[i]][to].user = to;
-                _tokenMetadata[ids[i]][to].amount += values[i];
-                _tokenMetadata[ids[i]][to].id = ids[i];
-                _tokenMetadata[ids[i]][to].expiration = _tokenMetadata[ids[i]][from].expiration;
-                _tokenMetadata[ids[i]][to].nonTransferable = _tokenMetadata[ids[i]][from].nonTransferable;
-                _tokenMetadata[ids[i]][to].uri = uri(ids[i]);
-
-                // Update the amount in the sender's metadata
-                _tokenMetadata[ids[i]][from].amount -= values[i];
-            }
-
-        }
-
-    }
 }
