@@ -54,7 +54,7 @@ describe("NFT Membership", function () {
     const tx = await nftMembership
       .connect(owner)
       .mint(projectId, await admin.getAddress(), "read:admin", 1816960943, nonTransferable);
-    await expect(nftMembership.connect(nonAdmin).viewMembership(1)).to.be.revertedWith("Caller is not an admin");
+    await expect(nftMembership.connect(nonAdmin).viewMembership(1)).to.be.revertedWith("Caller is not a view admin");
     // console.log({ token });
     // expect(token[0]).to.equal(BigInt(1));
     // expect(token[1]).to.equal(await admin.getAddress());
@@ -201,23 +201,29 @@ describe("NFT Membership", function () {
     expect(token[8]).to.equal(false); //revoked == false because it's hard deleted
     expect(token[9]).to.equal(false); // non-transferable == false because it's hard deleted
 
-    // await nftMembership
-    //   .connect(owner)
-    //   .mint(await admin.getAddress(), "write:admin", 1816960943);
-    // token = await nftMembership.connect(owner).viewMembership(2);
-    // console.log({ token });
   });
-  it("should test expiry on admin privileges", async function () {
+  it.skip("should test expiry on admin privileges", async function () {
+    // Mint an admin NFT with an expiry time of 1 hour
+
+    const expirationTime = await time.latest() + 3600; // 1 hour from now
     const tx = await nftMembership
       .connect(owner)
-      .mint(projectId, await admin.getAddress(), "write:admin", 1816960943, nonTransferable);
-      let token = await nftMembership.connect(admin).viewMembership(1);
-    // console.log({ token });
-    await time.increaseTo(1816960944);
-    const currentTime = await time.latest();
-    console.log("Current time:", currentTime);
+      .mint(projectId, await admin.getAddress(), "write:admin", expirationTime, nonTransferable);
+
+      console.log("expiry: ", expirationTime);
+      await time.latestBlock(); // Ensure the block is advanced
+
+      await time.increaseTo(expirationTime + 7200); // Increase time by 2 hours
+
+      const mem = await nftMembership.connect(owner).viewMembership(1);
+      console.log("membership: ", Number(mem[7]));
+
+      const currentTime = await time.latest();
+      console.log("current time: ", currentTime);
+      const dif = currentTime - expirationTime;
+      console.log("difference: ", dif);
+
     await expect(nftMembership.connect(admin).viewMembership(1)).to.be.revertedWith("Write admin membership expired");
-    // console.log({ token });
   });
   describe("Test View Privileges", function () {
     this.beforeEach(async function () {

@@ -19,6 +19,8 @@ describe("RevokableMembershipNFT", function () {
     const VIP_TYPE = "vip";
     const PREMIUM_TYPE = "premium";
     const PROJECT_ID = 1; // Example project ID for testing
+    const nonTransferable = false; // Default for most memberships
+    const transferable = true; // Default for write admin memberships
 
     beforeEach(async function () {
         [owner, writeAdmin, viewAdmin, user1, user2, user3, ...addrs] = await ethers.getSigners();
@@ -52,7 +54,7 @@ describe("RevokableMembershipNFT", function () {
             it("Should allow owner to mint", async function () {
                 const futureTime = (await time.latest()) + 3600;
 
-                await expect(membershipNFT.mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, false))
+                await expect(membershipNFT.mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, nonTransferable))
                     .to.emit(membershipNFT, "MembershipMinted")
                     .withArgs(PROJECT_ID, 1, user1.address, VIP_TYPE, false, false, futureTime, false);
             });
@@ -61,10 +63,10 @@ describe("RevokableMembershipNFT", function () {
                 const futureTime = (await time.latest()) + 3600;
                 
                 // First mint write admin
-                await membershipNFT.mint(PROJECT_ID, writeAdmin.address, WRITE_ADMIN_TYPE, futureTime, false);
+                await membershipNFT.mint(PROJECT_ID, writeAdmin.address, WRITE_ADMIN_TYPE, futureTime, nonTransferable);
                 
                 // Write admin mints for user
-                await expect(membershipNFT.connect(writeAdmin).mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, false))
+                await expect(membershipNFT.connect(writeAdmin).mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, nonTransferable))
                     .to.emit(membershipNFT, "MembershipMinted")
                     .withArgs(PROJECT_ID,2, user1.address, VIP_TYPE, false, false, futureTime, false);
             });
@@ -72,37 +74,37 @@ describe("RevokableMembershipNFT", function () {
             it("Should reject minting from non-admin", async function () {
                 const futureTime = (await time.latest()) + 3600;
 
-                await expect(membershipNFT.connect(user1).mint(PROJECT_ID, user2.address, VIP_TYPE, futureTime, false))
+                await expect(membershipNFT.connect(user1).mint(PROJECT_ID, user2.address, VIP_TYPE, futureTime, nonTransferable))
                     .to.be.revertedWith("Caller is not an admin");
             });
 
             it("Should reject minting from expired admin", async function () {
                 const shortTime = (await time.latest()) + 100;
-                await membershipNFT.mint(PROJECT_ID, writeAdmin.address, WRITE_ADMIN_TYPE, shortTime, false);
+                await membershipNFT.mint(PROJECT_ID, writeAdmin.address, WRITE_ADMIN_TYPE, shortTime, nonTransferable);
 
                 await time.increase(200);
 
                 const futureTime = (await time.latest()) + 3600;
-                await expect(membershipNFT.connect(writeAdmin).mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, false))
+                await expect(membershipNFT.connect(writeAdmin).mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, nonTransferable))
                     .to.be.revertedWith("Admin membership expired");
             });
 
             it("Should reject minting from view admin (no write access)", async function () {
                 const futureTime = (await time.latest()) + 3600;
-                await membershipNFT.mint(PROJECT_ID, viewAdmin.address, READ_ADMIN_TYPE, futureTime, false);
+                await membershipNFT.mint(PROJECT_ID, viewAdmin.address, READ_ADMIN_TYPE, futureTime, nonTransferable);
 
-                await expect(membershipNFT.connect(viewAdmin).mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, false))
+                await expect(membershipNFT.connect(viewAdmin).mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, nonTransferable))
                     .to.be.revertedWith("Caller is not an admin");
             });
             
             it("Should reject minting from revoked admin", async function () {
                 const futureTime = (await time.latest()) + 3600;
-                await membershipNFT.mint(PROJECT_ID, writeAdmin.address, WRITE_ADMIN_TYPE, futureTime, false);
+                await membershipNFT.mint(PROJECT_ID, writeAdmin.address, WRITE_ADMIN_TYPE, futureTime, nonTransferable);
                 
                 // Revoke write admin
                 await membershipNFT.revoke(1, false);
 
-                await expect(membershipNFT.connect(writeAdmin).mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, false))
+                await expect(membershipNFT.connect(writeAdmin).mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, nonTransferable))
                     .to.be.revertedWith("Caller is not an admin");
             });
         });
@@ -111,12 +113,12 @@ describe("RevokableMembershipNFT", function () {
             it("Should reject past expiration dates", async function () {
                 const pastTime = (await time.latest()) - 3600;
 
-                await expect(membershipNFT.mint(PROJECT_ID, user1.address, VIP_TYPE, pastTime, false))
+                await expect(membershipNFT.mint(PROJECT_ID, user1.address, VIP_TYPE, pastTime, nonTransferable))
                     .to.be.revertedWith("Expiration must be in the future or 0 if no expiration");
             });
 
             it("Should accept zero expiration (no expiry)", async function () {
-                await expect(membershipNFT.mint(PROJECT_ID, user1.address, VIP_TYPE, 0, false))
+                await expect(membershipNFT.mint(PROJECT_ID, user1.address, VIP_TYPE, 0, nonTransferable))
                     .to.emit(membershipNFT, "MembershipMinted")
                     .withArgs(PROJECT_ID, 1, user1.address, VIP_TYPE, false, false, 0, false);
             });
@@ -124,14 +126,14 @@ describe("RevokableMembershipNFT", function () {
             it("Should reject minting to zero address", async function () {
                 const futureTime = (await time.latest()) + 3600;
                 
-                await expect(membershipNFT.mint(PROJECT_ID, ethers.ZeroAddress, VIP_TYPE, futureTime, false))
+                await expect(membershipNFT.mint(PROJECT_ID, ethers.ZeroAddress, VIP_TYPE, futureTime, nonTransferable))
                     .to.be.revertedWithCustomError(membershipNFT, "ERC721InvalidReceiver");
             });
 
             it("Should handle empty membership type string", async function () {
                 const futureTime = (await time.latest()) + 3600;
                 
-                await expect(membershipNFT.mint(PROJECT_ID, user1.address, "", futureTime, false))
+                await expect(membershipNFT.mint(PROJECT_ID, user1.address, "", futureTime, nonTransferable))
                     .to.emit(membershipNFT, "MembershipMinted");
             });
 
@@ -139,7 +141,7 @@ describe("RevokableMembershipNFT", function () {
                 const futureTime = (await time.latest()) + 3600;
                 const longString = "a".repeat(1000);
                 
-                await expect(membershipNFT.mint(PROJECT_ID, user1.address, longString, futureTime, false))
+                await expect(membershipNFT.mint(PROJECT_ID, user1.address, longString, futureTime, nonTransferable))
                     .to.emit(membershipNFT, "MembershipMinted");
             });
 
@@ -147,14 +149,14 @@ describe("RevokableMembershipNFT", function () {
                 const futureTime = (await time.latest()) + 3600;
                 const maxProjectId = ethers.MaxUint256;
                 
-                await expect(membershipNFT.mint(maxProjectId, user1.address, VIP_TYPE, futureTime, false))
+                await expect(membershipNFT.mint(maxProjectId, user1.address, VIP_TYPE, futureTime, nonTransferable))
                     .to.emit(membershipNFT, "MembershipMinted");
             });
 
             it("Should handle maximum expiration timestamp", async function () {
                 const maxTimestamp = ethers.MaxUint256;
                 
-                await expect(membershipNFT.mint(PROJECT_ID, user1.address, VIP_TYPE, maxTimestamp, false))
+                await expect(membershipNFT.mint(PROJECT_ID, user1.address, VIP_TYPE, maxTimestamp, nonTransferable))
                     .to.emit(membershipNFT, "MembershipMinted");
             });
         });
@@ -163,7 +165,7 @@ describe("RevokableMembershipNFT", function () {
             it("Should create write admin with correct permissions", async function () {
                 const futureTime = (await time.latest()) + 3600;
 
-                await membershipNFT.mint(PROJECT_ID, writeAdmin.address, WRITE_ADMIN_TYPE, futureTime, false);
+                await membershipNFT.mint(PROJECT_ID, writeAdmin.address, WRITE_ADMIN_TYPE, futureTime, nonTransferable);
 
                 const membership = await membershipNFT.viewMembership(1);
                 expect(membership.writeAccess).to.be.true;
@@ -177,10 +179,10 @@ describe("RevokableMembershipNFT", function () {
             it("Should create non-transferable write admin", async function () {
                 const futureTime = (await time.latest()) + 3600;
 
-                await membershipNFT.mint(PROJECT_ID, writeAdmin.address, WRITE_ADMIN_TYPE, futureTime, true);
+                await membershipNFT.mint(PROJECT_ID, writeAdmin.address, WRITE_ADMIN_TYPE, futureTime, transferable);
 
                 const membership = await membershipNFT.viewMembership(1);
-                expect(membership.nonTransferable).to.be.true;
+                expect(membership.transferable).to.be.true;
             });
         });
 
@@ -188,7 +190,7 @@ describe("RevokableMembershipNFT", function () {
             it("Should create read admin with correct permissions", async function () {
                 const futureTime = (await time.latest()) + 3600;
 
-                await membershipNFT.mint(PROJECT_ID, viewAdmin.address, READ_ADMIN_TYPE, futureTime, false);
+                await membershipNFT.mint(PROJECT_ID, viewAdmin.address, READ_ADMIN_TYPE, futureTime, nonTransferable);
 
                 const membership = await membershipNFT.connect(viewAdmin).viewMembership(1);
                 expect(membership.writeAccess).to.be.false;
@@ -202,7 +204,7 @@ describe("RevokableMembershipNFT", function () {
             it("Should create regular membership with no admin permissions", async function () {
                 const futureTime = (await time.latest()) + 3600;
 
-                await membershipNFT.mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, false);
+                await membershipNFT.mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, nonTransferable);
 
                 const membership = await membershipNFT.viewMembership(1);
                 expect(membership.writeAccess).to.be.false;
@@ -214,11 +216,11 @@ describe("RevokableMembershipNFT", function () {
             it("Should create premium membership", async function () {
                 const futureTime = (await time.latest()) + 3600;
 
-                await membershipNFT.mint(PROJECT_ID, user1.address, PREMIUM_TYPE, futureTime, true);
+                await membershipNFT.mint(PROJECT_ID, user1.address, PREMIUM_TYPE, futureTime, transferable);
 
                 const membership = await membershipNFT.viewMembership(1);
                 expect(membership.membershipType).to.equal(PREMIUM_TYPE);
-                expect(membership.nonTransferable).to.be.true;
+                expect(membership.transferable).to.be.true;
             });
         });
 
@@ -228,17 +230,17 @@ describe("RevokableMembershipNFT", function () {
                 
                 expect(await membershipNFT.nextTokenId()).to.equal(0);
 
-                await membershipNFT.mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, false);
+                await membershipNFT.mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, nonTransferable);
                 expect(await membershipNFT.nextTokenId()).to.equal(1);
 
-                await membershipNFT.mint(PROJECT_ID, user2.address, PREMIUM_TYPE, futureTime, false);
+                await membershipNFT.mint(PROJECT_ID, user2.address, PREMIUM_TYPE, futureTime, nonTransferable);
                 expect(await membershipNFT.nextTokenId()).to.equal(2);
             });
 
             it("Should mint NFT to correct address", async function () {
                 const futureTime = (await time.latest()) + 3600;
 
-                await membershipNFT.mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, false);
+                await membershipNFT.mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, nonTransferable);
 
                 expect(await membershipNFT.ownerOf(1)).to.equal(user1.address);
                 expect(await membershipNFT.balanceOf(user1.address)).to.equal(1);
@@ -248,8 +250,8 @@ describe("RevokableMembershipNFT", function () {
             it("Should handle multiple mints to same address", async function () {
                 const futureTime = (await time.latest()) + 3600;
                 
-                await membershipNFT.mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, false);
-                await membershipNFT.mint(PROJECT_ID, user1.address, PREMIUM_TYPE, futureTime, false);
+                await membershipNFT.mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, nonTransferable);
+                await membershipNFT.mint(PROJECT_ID, user1.address, PREMIUM_TYPE, futureTime, nonTransferable);
                 
                 expect(await membershipNFT.balanceOf(user1.address)).to.equal(2);
                 expect(await membershipNFT.ownerOf(1)).to.equal(user1.address);
@@ -259,8 +261,8 @@ describe("RevokableMembershipNFT", function () {
             it("Should handle same membership type for different projects", async function () {
                 const futureTime = (await time.latest()) + 3600;
                 
-                await membershipNFT.mint(1, user1.address, VIP_TYPE, futureTime, false);
-                await membershipNFT.mint(2, user1.address, VIP_TYPE, futureTime, false);
+                await membershipNFT.mint(1, user1.address, VIP_TYPE, futureTime, nonTransferable);
+                await membershipNFT.mint(2, user1.address, VIP_TYPE, futureTime, nonTransferable);
                 
                 const membership1 = await membershipNFT.viewMembership(1);
                 const membership2 = await membershipNFT.viewMembership(2);
@@ -276,9 +278,9 @@ describe("RevokableMembershipNFT", function () {
     describe("revoke", function () {
         beforeEach(async function () {
             const futureTime = (await time.latest()) + 3600;
-            await membershipNFT.mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, false);
-            await membershipNFT.mint(PROJECT_ID, writeAdmin.address, WRITE_ADMIN_TYPE, futureTime, false);
-            await membershipNFT.mint(PROJECT_ID, viewAdmin.address, READ_ADMIN_TYPE, futureTime, false);
+            await membershipNFT.mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, nonTransferable);
+            await membershipNFT.mint(PROJECT_ID, writeAdmin.address, WRITE_ADMIN_TYPE, futureTime, nonTransferable);
+            await membershipNFT.mint(PROJECT_ID, viewAdmin.address, READ_ADMIN_TYPE, futureTime, nonTransferable);
         });
 
         describe("Access Control", function () {
@@ -372,7 +374,7 @@ describe("RevokableMembershipNFT", function () {
         describe("Edge Cases", function () {
             it("Should handle revoking after token transfer", async function () {
                 const futureTime = (await time.latest()) + 3600;
-                await membershipNFT.mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, false);
+                await membershipNFT.mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, transferable);
                 
                 // Transfer token
                 await membershipNFT.connect(user1).transferFrom(user1.address, user2.address, 4);
@@ -385,7 +387,7 @@ describe("RevokableMembershipNFT", function () {
 
             it("Should handle revoking expired membership", async function () {
                 const shortTime = (await time.latest()) + 100;
-                await membershipNFT.mint(PROJECT_ID, user1.address, VIP_TYPE, shortTime, false);
+                await membershipNFT.mint(PROJECT_ID, user1.address, VIP_TYPE, shortTime, nonTransferable);
                 
                 await time.increase(200);
                 
@@ -397,8 +399,8 @@ describe("RevokableMembershipNFT", function () {
 
             it("Should handle multiple admin types for same user", async function () {
                 const futureTime = (await time.latest()) + 3600;
-                await membershipNFT.mint(PROJECT_ID, writeAdmin.address, WRITE_ADMIN_TYPE, futureTime, false);
-                await membershipNFT.mint(PROJECT_ID, writeAdmin.address, READ_ADMIN_TYPE, futureTime, false);
+                await membershipNFT.mint(PROJECT_ID, writeAdmin.address, WRITE_ADMIN_TYPE, futureTime, nonTransferable);
+                await membershipNFT.mint(PROJECT_ID, writeAdmin.address, READ_ADMIN_TYPE, futureTime, nonTransferable);
                 
                 // Revoke write admin
                 await membershipNFT.revoke(4, false);
@@ -410,7 +412,7 @@ describe("RevokableMembershipNFT", function () {
 
             it("Should handle burning last token", async function () {
                 const futureTime = (await time.latest()) + 3600;
-                await membershipNFT.mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, false);
+                await membershipNFT.mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, nonTransferable);
                 
                 expect(await membershipNFT.totalSupply()).to.equal(4);
                 
@@ -424,8 +426,8 @@ describe("RevokableMembershipNFT", function () {
     describe("viewMembership", function () {
         beforeEach(async function () {
             const futureTime = (await time.latest()) + 3600;
-            await membershipNFT.mint(PROJECT_ID, viewAdmin.address, READ_ADMIN_TYPE, futureTime, false);
-            await membershipNFT.mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, false);
+            await membershipNFT.mint(PROJECT_ID, viewAdmin.address, READ_ADMIN_TYPE, futureTime, nonTransferable);
+            await membershipNFT.mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, nonTransferable);
         });
 
         describe("Access Control", function () {
@@ -441,8 +443,8 @@ describe("RevokableMembershipNFT", function () {
 
             it("Should allow write admin to view", async function () {
                 const futureTime = (await time.latest()) + 3600;
-                await membershipNFT.mint(PROJECT_ID, writeAdmin.address, WRITE_ADMIN_TYPE, futureTime, false);
-                
+                await membershipNFT.mint(PROJECT_ID, writeAdmin.address, WRITE_ADMIN_TYPE, futureTime, nonTransferable);
+
                 const membership = await membershipNFT.connect(writeAdmin).viewMembership(1);
                 expect(membership.membershipType).to.equal(READ_ADMIN_TYPE);
             });
@@ -454,7 +456,7 @@ describe("RevokableMembershipNFT", function () {
             
             it("Should reject view from revoked admin", async function () {
                 const futureTime = (await time.latest()) + 3600;
-                await membershipNFT.mint(PROJECT_ID, writeAdmin.address, WRITE_ADMIN_TYPE, futureTime, false);
+                await membershipNFT.mint(PROJECT_ID, writeAdmin.address, WRITE_ADMIN_TYPE, futureTime, nonTransferable);
 
                 // Revoke write admin
                 await membershipNFT.revoke(3, false);
@@ -474,7 +476,7 @@ describe("RevokableMembershipNFT", function () {
                 expect(membership.writeAccess).to.be.false;
                 expect(membership.viewAccess).to.be.true;
                 expect(membership.revoked).to.be.false;
-                expect(membership.nonTransferable).to.be.false;
+                expect(membership.transferable).to.be.false;
             });
 
             it("Should handle viewing non-existent membership", async function () {
@@ -497,9 +499,9 @@ describe("RevokableMembershipNFT", function () {
     describe("viewAllMemberships", function () {
         beforeEach(async function () {
             const futureTime = (await time.latest()) + 3600;
-            await membershipNFT.mint(PROJECT_ID, viewAdmin.address, READ_ADMIN_TYPE, futureTime, false);
-            await membershipNFT.mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, false);
-            await membershipNFT.mint(PROJECT_ID, user2.address, PREMIUM_TYPE, futureTime, true);
+            await membershipNFT.mint(PROJECT_ID, viewAdmin.address, READ_ADMIN_TYPE, futureTime, nonTransferable);
+            await membershipNFT.mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, nonTransferable);
+            await membershipNFT.mint(PROJECT_ID, user2.address, PREMIUM_TYPE, futureTime, transferable);
         });
 
         describe("Access Control", function () {
@@ -556,7 +558,7 @@ describe("RevokableMembershipNFT", function () {
                 // Mint 10 memberships to test gas limits (reduced to avoid gas issues)
                 const futureTime = (await time.latest()) + 3600;
                 for (let i = 0; i < 10; i++) {
-                    await membershipNFT.mint(PROJECT_ID, addrs[i % addrs.length].address, VIP_TYPE, futureTime, false);
+                    await membershipNFT.mint(PROJECT_ID, addrs[i % addrs.length].address, VIP_TYPE, futureTime, nonTransferable);
                 }
                 
                 const memberships = await membershipNFT.connect(viewAdmin).viewAllMemberships();
@@ -568,9 +570,9 @@ describe("RevokableMembershipNFT", function () {
     describe("viewAllMembershipsWithTokenIds", function () {
         beforeEach(async function () {
             const futureTime = (await time.latest()) + 3600;
-            await membershipNFT.mint(PROJECT_ID, viewAdmin.address, READ_ADMIN_TYPE, futureTime, false);
-            await membershipNFT.mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, false);
-            await membershipNFT.mint(PROJECT_ID, user2.address, PREMIUM_TYPE, futureTime, true);
+            await membershipNFT.mint(PROJECT_ID, viewAdmin.address, READ_ADMIN_TYPE, futureTime, nonTransferable);
+            await membershipNFT.mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, nonTransferable);
+            await membershipNFT.mint(PROJECT_ID, user2.address, PREMIUM_TYPE, futureTime, transferable);
         });
 
         describe("Access Control", function () {
@@ -621,10 +623,10 @@ describe("RevokableMembershipNFT", function () {
         it("Should increment after minting", async function () {
             const futureTime = (await time.latest()) + 3600;
             
-            await membershipNFT.mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, false);
+            await membershipNFT.mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, nonTransferable);
             expect(await membershipNFT.nextTokenId()).to.equal(1);
             
-            await membershipNFT.mint(PROJECT_ID, user2.address, PREMIUM_TYPE, futureTime, false);
+            await membershipNFT.mint(PROJECT_ID, user2.address, PREMIUM_TYPE, futureTime, nonTransferable);
             expect(await membershipNFT.nextTokenId()).to.equal(2);
         });
 
@@ -636,9 +638,9 @@ describe("RevokableMembershipNFT", function () {
     describe("_update (Transfer Restrictions)", function () {
         beforeEach(async function () {
             const futureTime = (await time.latest()) + 3600;
-            await membershipNFT.mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, false); // transferable
-            await membershipNFT.mint(PROJECT_ID, user2.address, PREMIUM_TYPE, futureTime, true); // non-transferable
-            await membershipNFT.mint(PROJECT_ID, writeAdmin.address, WRITE_ADMIN_TYPE, futureTime, false); // transferable
+            await membershipNFT.mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, transferable); 
+            await membershipNFT.mint(PROJECT_ID, user2.address, PREMIUM_TYPE, futureTime, nonTransferable); 
+            await membershipNFT.mint(PROJECT_ID, writeAdmin.address, WRITE_ADMIN_TYPE, futureTime, nonTransferable); 
         });
 
         describe("Transferable Memberships", function () {
@@ -683,13 +685,13 @@ describe("RevokableMembershipNFT", function () {
             
             it('should allow an owner or admin to mint a non-transferable membership', async function () {
                 const futureTime = (await time.latest()) + 3600;
-                await membershipNFT.mint(PROJECT_ID, user3.address, PREMIUM_TYPE, futureTime, true);
+                await membershipNFT.mint(PROJECT_ID, user3.address, PREMIUM_TYPE, futureTime, transferable);
                 expect(await membershipNFT.ownerOf(4)).to.equal(user3.address);
             });
             
             it('should prevent an admin from burning if their admin membership is expired', async function () {
                 const shortTime = (await time.latest()) + 100;
-                await membershipNFT.mint(PROJECT_ID, writeAdmin.address, WRITE_ADMIN_TYPE, shortTime, false);
+                await membershipNFT.mint(PROJECT_ID, writeAdmin.address, WRITE_ADMIN_TYPE, shortTime, nonTransferable);
                 
                 await time.increase(200);
                 
@@ -699,7 +701,7 @@ describe("RevokableMembershipNFT", function () {
             
             it('should prevent an admin from burning if their admin membership is revoked', async function () {
                 const futureTime = (await time.latest()) + 3600;
-                await membershipNFT.mint(PROJECT_ID, writeAdmin.address, WRITE_ADMIN_TYPE, futureTime, false);
+                await membershipNFT.mint(PROJECT_ID, writeAdmin.address, WRITE_ADMIN_TYPE, futureTime, nonTransferable);
 
                 // Revoke write admin
                 await membershipNFT.revoke(3, false);
@@ -727,8 +729,8 @@ describe("RevokableMembershipNFT", function () {
                 const futureTime = (await time.latest()) + 3600;
                 const shortTime = (await time.latest()) + 100;
                 
-                await membershipNFT.mint(PROJECT_ID, user3.address, VIP_TYPE, futureTime, false);
-                await membershipNFT.mint(PROJECT_ID, user3.address, WRITE_ADMIN_TYPE, shortTime, false);
+                await membershipNFT.mint(PROJECT_ID, user3.address, VIP_TYPE, futureTime, nonTransferable);
+                await membershipNFT.mint(PROJECT_ID, user3.address, WRITE_ADMIN_TYPE, shortTime, nonTransferable);
                 
                 await time.increase(200);
                 
@@ -738,10 +740,10 @@ describe("RevokableMembershipNFT", function () {
 
             it("Should handle admin transferring non-transferable token they own", async function () {
                 const futureTime = (await time.latest()) + 3600;
-                await membershipNFT.mint(PROJECT_ID, user3.address, WRITE_ADMIN_TYPE, futureTime, true); // non-transferable admin
+                await membershipNFT.mint(PROJECT_ID, user3.address, WRITE_ADMIN_TYPE, futureTime, transferable); 
                 
                 // Admin should still be able to use admin functions even on their own non-transferable token
-                await membershipNFT.connect(user3).mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, false);
+                await membershipNFT.connect(user3).mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, nonTransferable);
                 expect(await membershipNFT.ownerOf(5)).to.equal(user1.address);
             });
         });
@@ -754,10 +756,10 @@ describe("RevokableMembershipNFT", function () {
 
             it("Should allow write admin operations", async function () {
                 const futureTime = (await time.latest()) + 3600;
-                await membershipNFT.mint(PROJECT_ID, writeAdmin.address, WRITE_ADMIN_TYPE, futureTime, false);
+                await membershipNFT.mint(PROJECT_ID, writeAdmin.address, WRITE_ADMIN_TYPE, futureTime, nonTransferable);
 
                 // Write admin should be able to perform admin operations even on non-transferable tokens
-                const membership = await membershipNFT.connect(writeAdmin).mint(PROJECT_ID, user3.address, VIP_TYPE, futureTime, true);
+                const membership = await membershipNFT.connect(writeAdmin).mint(PROJECT_ID, user3.address, VIP_TYPE, futureTime, transferable);
                 const receipt = await membership.wait(1);
                 expect(receipt.status).to.equal(1);
             });
@@ -789,23 +791,23 @@ describe("RevokableMembershipNFT", function () {
         describe("onlyAdmin", function () {
             it("Should pass for owner", async function () {
                 const futureTime = (await time.latest()) + 3600;
-                await expect(membershipNFT.mint(PROJECT_ID,user1.address, VIP_TYPE, futureTime, false))
+                await expect(membershipNFT.mint(PROJECT_ID,user1.address, VIP_TYPE, futureTime, nonTransferable))
                     .to.not.be.reverted;
             });
 
             it("Should pass for valid write admin", async function () {
                 const futureTime = (await time.latest()) + 3600;
-                await membershipNFT.mint(PROJECT_ID, writeAdmin.address, WRITE_ADMIN_TYPE, futureTime, false);
+                await membershipNFT.mint(PROJECT_ID, writeAdmin.address, WRITE_ADMIN_TYPE, futureTime, nonTransferable);
                 
-                await expect(membershipNFT.connect(writeAdmin).mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, false))
+                await expect(membershipNFT.connect(writeAdmin).mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, nonTransferable))
                     .to.not.be.reverted;
             });
 
             it("Should fail for view admin", async function () {
                 const futureTime = (await time.latest()) + 3600;
-                await membershipNFT.mint(PROJECT_ID, viewAdmin.address, READ_ADMIN_TYPE, futureTime, false);
+                await membershipNFT.mint(PROJECT_ID, viewAdmin.address, READ_ADMIN_TYPE, futureTime, nonTransferable);
                 
-                await expect(membershipNFT.connect(viewAdmin).mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, false))
+                await expect(membershipNFT.connect(viewAdmin).mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, nonTransferable))
                     .to.be.revertedWith("Caller is not an admin");
             });
         });
@@ -813,28 +815,28 @@ describe("RevokableMembershipNFT", function () {
         describe("onlyViewAdmin", function () {
             it("Should pass for owner", async function () {
                 const futureTime = (await time.latest()) + 3600;
-                await membershipNFT.mint(PROJECT_ID,user1.address, VIP_TYPE, futureTime, false);
+                await membershipNFT.mint(PROJECT_ID,user1.address, VIP_TYPE, futureTime, nonTransferable);
                 
                 await expect(membershipNFT.viewMembership(1)).to.not.be.reverted;
             });
 
             it("Should pass for view admin", async function () {
                 const futureTime = (await time.latest()) + 3600;
-                await membershipNFT.mint(PROJECT_ID, viewAdmin.address, READ_ADMIN_TYPE, futureTime, false);
+                await membershipNFT.mint(PROJECT_ID, viewAdmin.address, READ_ADMIN_TYPE, futureTime, nonTransferable);
                 
                 await expect(membershipNFT.connect(viewAdmin).viewMembership(1)).to.not.be.reverted;
             });
 
             it("Should pass for write admin", async function () {
                 const futureTime = (await time.latest()) + 3600;
-                await membershipNFT.mint(PROJECT_ID, writeAdmin.address, WRITE_ADMIN_TYPE, futureTime, false);
+                await membershipNFT.mint(PROJECT_ID, writeAdmin.address, WRITE_ADMIN_TYPE, futureTime, nonTransferable);
                 
                 await expect(membershipNFT.connect(writeAdmin).viewMembership(1)).to.not.be.reverted;
             });
 
             it("Should fail for regular user", async function () {
                 const futureTime = (await time.latest()) + 3600;
-                await membershipNFT.mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, false);
+                await membershipNFT.mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, nonTransferable);
                 
                 await expect(membershipNFT.connect(user2).viewMembership(1))
                     .to.be.revertedWith("Caller is not a view admin");
@@ -849,23 +851,23 @@ describe("RevokableMembershipNFT", function () {
                 const futureTime = (await time.latest()) + 3600;
                 
                 // This shouldn't happen in normal flow, but test edge case
-                await membershipNFT.mint(PROJECT_ID, writeAdmin.address, WRITE_ADMIN_TYPE, futureTime, false);
-                await membershipNFT.mint(PROJECT_ID, writeAdmin.address, READ_ADMIN_TYPE, futureTime, false);
+                await membershipNFT.mint(PROJECT_ID, writeAdmin.address, WRITE_ADMIN_TYPE, futureTime, nonTransferable);
+                await membershipNFT.mint(PROJECT_ID, writeAdmin.address, READ_ADMIN_TYPE, futureTime, nonTransferable);
                 
                 // Should still work with write access
-                await expect(membershipNFT.connect(writeAdmin).mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, false))
+                await expect(membershipNFT.connect(writeAdmin).mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, nonTransferable))
                     .to.not.be.reverted;
             });
 
             it("Should handle admin at exact expiration time", async function () {
                 const exactTime = (await time.latest()) + 1000;
-                await membershipNFT.mint(PROJECT_ID, writeAdmin.address, WRITE_ADMIN_TYPE, exactTime, false);
+                await membershipNFT.mint(PROJECT_ID, writeAdmin.address, WRITE_ADMIN_TYPE, exactTime, nonTransferable);
                 
                 // Set time to exactly the expiration
                 await time.increaseTo(exactTime);
                 
                 const futureTime = (await time.latest()) + 3600;
-                await expect(membershipNFT.connect(writeAdmin).mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, false))
+                await expect(membershipNFT.connect(writeAdmin).mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, nonTransferable))
                     .to.be.revertedWith("Admin membership expired");
             });
         });
@@ -875,8 +877,8 @@ describe("RevokableMembershipNFT", function () {
                 const futureTime = (await time.latest()) + 3600;
                 const shortTime = (await time.latest()) + 100;
                 
-                await membershipNFT.mint(PROJECT_ID, viewAdmin.address, READ_ADMIN_TYPE, futureTime, false);
-                await membershipNFT.mint(PROJECT_ID, viewAdmin.address, WRITE_ADMIN_TYPE, shortTime, false);
+                await membershipNFT.mint(PROJECT_ID, viewAdmin.address, READ_ADMIN_TYPE, futureTime, nonTransferable);
+                await membershipNFT.mint(PROJECT_ID, viewAdmin.address, WRITE_ADMIN_TYPE, shortTime, nonTransferable);
                 
                 await time.increase(200);
                 
@@ -887,10 +889,10 @@ describe("RevokableMembershipNFT", function () {
 
             it("Should handle admin with one revoked and one active membership", async function () {
                 const futureTime = (await time.latest()) + 3600;
-                
-                await membershipNFT.mint(PROJECT_ID, viewAdmin.address, READ_ADMIN_TYPE, futureTime, false);
-                await membershipNFT.mint(PROJECT_ID, viewAdmin.address, WRITE_ADMIN_TYPE, futureTime, false);
-                
+
+                await membershipNFT.mint(PROJECT_ID, viewAdmin.address, READ_ADMIN_TYPE, futureTime, nonTransferable);
+                await membershipNFT.mint(PROJECT_ID, viewAdmin.address, WRITE_ADMIN_TYPE, futureTime, nonTransferable);
+
                 // Revoke read admin but keep write admin
                 await membershipNFT.revoke(1, false);
                 
@@ -905,7 +907,7 @@ describe("RevokableMembershipNFT", function () {
         it("Should handle minting with reasonable gas usage", async function () {
             const futureTime = (await time.latest()) + 3600;
             
-            const tx = await membershipNFT.mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, false);
+            const tx = await membershipNFT.mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, nonTransferable);
             const receipt = await tx.wait();
             
             // Gas should be reasonable (adjust threshold as needed)
@@ -914,7 +916,7 @@ describe("RevokableMembershipNFT", function () {
 
         it("Should handle revocation with reasonable gas usage", async function () {
             const futureTime = (await time.latest()) + 3600;
-            await membershipNFT.mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, false);
+            await membershipNFT.mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, nonTransferable);
             
             const tx = await membershipNFT.revoke(1, false);
             const receipt = await tx.wait();
@@ -928,10 +930,10 @@ describe("RevokableMembershipNFT", function () {
             const futureTime = (await time.latest()) + 3600;
             
             // 1. Mint admin
-            await membershipNFT.mint(PROJECT_ID, writeAdmin.address, WRITE_ADMIN_TYPE, futureTime, false);
+            await membershipNFT.mint(PROJECT_ID, writeAdmin.address, WRITE_ADMIN_TYPE, futureTime, nonTransferable);
             
             // 2. Admin mints user membership
-            await membershipNFT.connect(writeAdmin).mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, false);
+            await membershipNFT.connect(writeAdmin).mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, transferable);
             
             // 3. Transfer membership
             await membershipNFT.connect(user1).transferFrom(user1.address, user2.address, 2);
@@ -953,10 +955,10 @@ describe("RevokableMembershipNFT", function () {
             const futureTime = (await time.latest()) + 3600;
             
             // 1. Create write admin
-            await membershipNFT.mint(PROJECT_ID, writeAdmin.address, WRITE_ADMIN_TYPE, futureTime, false);
+            await membershipNFT.mint(PROJECT_ID, writeAdmin.address, WRITE_ADMIN_TYPE, futureTime, nonTransferable);
             
             // 2. Write admin creates read admin
-            await membershipNFT.connect(writeAdmin).mint(PROJECT_ID, viewAdmin.address, READ_ADMIN_TYPE, futureTime, false);
+            await membershipNFT.connect(writeAdmin).mint(PROJECT_ID, viewAdmin.address, READ_ADMIN_TYPE, futureTime, nonTransferable);
             
             // 3. Revoke write admin
             await membershipNFT.revoke(1, false);
@@ -966,7 +968,7 @@ describe("RevokableMembershipNFT", function () {
                 .to.not.be.reverted;
             
             // 5. But write operations should fail
-            await expect(membershipNFT.connect(writeAdmin).mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, false))
+            await expect(membershipNFT.connect(writeAdmin).mint(PROJECT_ID, user1.address, VIP_TYPE, futureTime, nonTransferable))
                 .to.be.revertedWith('Caller is not an admin');
         });
 
@@ -974,9 +976,9 @@ describe("RevokableMembershipNFT", function () {
             const futureTime = (await time.latest()) + 3600;
             
             // Create memberships for different projects
-            await membershipNFT.mint(1, user1.address, VIP_TYPE, futureTime, false);
-            await membershipNFT.mint(2, user1.address, VIP_TYPE, futureTime, false);
-            await membershipNFT.mint(3, user2.address, VIP_TYPE, futureTime, false);
+            await membershipNFT.mint(1, user1.address, VIP_TYPE, futureTime, nonTransferable);
+            await membershipNFT.mint(2, user1.address, VIP_TYPE, futureTime, nonTransferable);
+            await membershipNFT.mint(3, user2.address, VIP_TYPE, futureTime, nonTransferable);
             
             const membership1 = await membershipNFT.viewMembership(1);
             const membership2 = await membershipNFT.viewMembership(2);
