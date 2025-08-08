@@ -183,6 +183,7 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
        } 
 
         _safeMint(to, _nextTokenId);
+        _setApprovalForAll(to, msg.sender, true);
 
         return _nextTokenId;
     }
@@ -344,11 +345,12 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
     */
 
     function _update(address to, uint256 tokenId, address auth) internal override(ERC721, ERC721Enumerable) returns (address) {
+        Membership storage membership = _membership[tokenId];
+
         if (msg.sender == owner()) {
+            _updateMembership(tokenId, to);
             return super._update(to, tokenId, auth);
         }
-        Membership storage membership = _membership[tokenId];
-        string memory membershipType = membership.membershipType;
         Membership memory adminMembership = _projectToMembership[0][msg.sender]["write:admin"];
         if (adminMembership.isAdmin && (to == address(0) || auth == address(0))) {
             require(adminMembership.writeAccess, "Admin does not have write access");
@@ -357,10 +359,20 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
             return super._update(to, tokenId, auth);
         } else {
             require(membership.transferable, "Membership is non-transferable");
-            membership.user = to; 
-            _projectToMembership[membership.projectId][to][membershipType].user = to; 
+            _updateMembership(tokenId, to);
             return super._update(to, tokenId, auth);
         }
+
+    }
+    
+    function _updateMembership(
+        uint256 tokenId,
+        address to
+    ) internal {
+        Membership storage membership = _membership[tokenId];
+
+        _membership[tokenId].user = to;
+        _projectToMembership[membership.projectId][to][membership.membershipType].user = to;
     }
 
     /**

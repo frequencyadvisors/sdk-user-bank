@@ -711,6 +711,17 @@ describe("RevokableMembershipNFT", function () {
             });
         });
 
+        describe("Transfer from Owner Account (V1 only)", function () {
+            it("Should allow transfer of memberships by owner account", async function () {
+                await membershipNFT.connect(owner).mint(PROJECT_ID, user1.address, VIP_TYPE, (await time.latest()) + 3600, transferable);
+                await membershipNFT.connect(owner).transferFrom(user1.address, user2.address, 1);
+                await membershipNFT.connect(owner).transferFrom(user2.address, user3.address, 1);
+
+                const membership = await membershipNFT.viewMembership(1);
+                expect(membership.user).to.equal(user3.address);
+            });
+        });
+
         describe("Edge Cases", function () {
             it("Should handle transfer to same address", async function () {
                 // Transfer to self should work
