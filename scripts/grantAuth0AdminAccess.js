@@ -2,7 +2,7 @@
 const { ethers } = require("hardhat");
 
 async function main() {
-    const contractAddress = "0x9d7784a4221410d67564bE7118d00961B33DE581";
+    const contractAddress = "0xb08e098D9F3CBAa3B909Ff1A2955C26f30764F35";
     const RevocableNFT = await ethers.getContractAt("RevokableMembershipNFT", contractAddress);
 
     const [owner] = await ethers.getSigners();
@@ -18,9 +18,9 @@ async function main() {
 
     console.log(`Minting transaction successful: ${receipt.status === 1}`);
 
-    const tokenId = Number(receipt.logs[0].args[1]);
+    const tokenId = receipt.logs[0].args[2];
 
-    const membership = await RevocableNFT.viewMembership(28);
+    const membership = await RevocableNFT.viewMembership(tokenId);
     console.log(`Membership minted: membership ${membership.membershipType} for project ${membership.projectId} to ${membership.user} with token ID ${membership.tokenId}`);
     console.log(`is transferable: ${membership.transferable}, expiration: ${membership.expiration}`);
 }
