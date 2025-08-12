@@ -15,8 +15,9 @@ async function main() {
     const kirsty = "0x61b33e2b591202d68A3ac4950F1687A0f67E2d80";
     const toba = "0x4950b897348004B8b2bFF1D37788147F9612bd56"; 
     const pasquale = "0x766E360ce143a4959396Dd5DbBA2808F8092D6f9";
+    const nish = "0xF5abbD37397E8dB85A25E5De472a932807Cb4220"; 
 
-    const auth0WalletAddresses = [bence, hiren, kirsty, toba, pasquale]; 
+    const auth0WalletAddresses = [bence, hiren, kirsty, toba, pasquale, nish]; 
     const [owner] = await hre.ethers.getSigners();
 
     auth0WalletAddresses.forEach(async (address) => {
