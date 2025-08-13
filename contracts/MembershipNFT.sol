@@ -148,6 +148,7 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
         require(!membership.revoked, "Membership already revoked");
 
         if (hardDelete) {
+
             _burn(tokenId);
             delete _membership[tokenId];
             delete _projectToMembership[membership.projectId][membership.user][membership.membershipType];

@@ -416,6 +416,21 @@ describe("RevokableMembershipNFT", function () {
                 expect(membership.revoked).to.be.true;
                 expect(membership.user).to.equal(writeAdmin.address);
             });
+
+            it("Should handle viewing non-existent membership", async function () {
+                // This should return a default/empty struct rather than revert
+                const membership = await membershipNFT.viewMembership(999);
+                expect(membership.user).to.equal(ethers.ZeroAddress);
+                expect(membership.tokenId).to.equal(0);
+            });
+
+            it("Should view membership after soft revocation", async function () {
+                await membershipNFT.revoke(2, false);
+                
+                const membership = await membershipNFT.connect(viewAdmin).viewMembership(2);
+                expect(membership.revoked).to.be.true;
+                expect(membership.user).to.equal(user1.address);
+            });
         });
     });
 
