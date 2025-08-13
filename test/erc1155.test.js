@@ -17,6 +17,8 @@ describe("SimpleERC1155", function () {
     const AMOUNT_10 = 10;
     const AMOUNT_100 = 100;
     const EMPTY_DATA = "0x";
+    const TRANSFERABLE = true;
+    const NON_TRANSFERABLE = false;
 
     beforeEach(async function () {
         [owner, user1, user2, user3, ...addrs] = await ethers.getSigners();
@@ -52,15 +54,15 @@ describe("SimpleERC1155", function () {
             it("Should allow owner to mint", async function () {
                 const futureTime = (await time.latest()) + 3600;
                 
-                await expect(erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_10, futureTime, false, EMPTY_DATA))
+                await expect(erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_10, futureTime, TRANSFERABLE, EMPTY_DATA))
                     .to.emit(erc1155, "TransferSingle")
                     .withArgs(owner.address, ethers.ZeroAddress, user1.address, TOKEN_ID_1, AMOUNT_10);
             });
 
             it("Should reject minting from non-owner", async function () {
                 const futureTime = (await time.latest()) + 3600;
-                
-                await expect(erc1155.connect(user1).mint(user2.address, TOKEN_ID_1, AMOUNT_10, futureTime, false, EMPTY_DATA))
+
+                await expect(erc1155.connect(user1).mint(user2.address, TOKEN_ID_1, AMOUNT_10, futureTime, TRANSFERABLE, EMPTY_DATA))
                     .to.be.revertedWithCustomError(erc1155, "OwnableUnauthorizedAccount")
                     .withArgs(user1.address);
             });
@@ -70,7 +72,7 @@ describe("SimpleERC1155", function () {
                 
                 await erc1155.transferOwnership(user1.address);
                 
-                await expect(erc1155.mint(user2.address, TOKEN_ID_1, AMOUNT_10, futureTime, false, EMPTY_DATA))
+                await expect(erc1155.mint(user2.address, TOKEN_ID_1, AMOUNT_10, futureTime, TRANSFERABLE, EMPTY_DATA))
                     .to.be.revertedWithCustomError(erc1155, "OwnableUnauthorizedAccount")
                     .withArgs(owner.address);
             });
@@ -80,7 +82,7 @@ describe("SimpleERC1155", function () {
                 
                 await erc1155.transferOwnership(user1.address);
                 
-                await expect(erc1155.connect(user1).mint(user2.address, TOKEN_ID_1, AMOUNT_10, futureTime, false, EMPTY_DATA))
+                await expect(erc1155.connect(user1).mint(user2.address, TOKEN_ID_1, AMOUNT_10, futureTime, TRANSFERABLE, EMPTY_DATA))
                     .to.emit(erc1155, "TransferSingle");
             });
         });
@@ -89,30 +91,30 @@ describe("SimpleERC1155", function () {
             it("Should reject minting to zero address", async function () {
                 const futureTime = (await time.latest()) + 3600;
                 
-                await expect(erc1155.mint(ethers.ZeroAddress, TOKEN_ID_1, AMOUNT_10, futureTime, false, EMPTY_DATA))
+                await expect(erc1155.mint(ethers.ZeroAddress, TOKEN_ID_1, AMOUNT_10, futureTime, TRANSFERABLE, EMPTY_DATA))
                     .to.be.revertedWith("Cannot mint to the zero address");
             });
 
             it("Should reject token ID of zero", async function () {
                 const futureTime = (await time.latest()) + 3600;
                 
-                await expect(erc1155.mint(user1.address, 0, AMOUNT_10, futureTime, false, EMPTY_DATA))
+                await expect(erc1155.mint(user1.address, 0, AMOUNT_10, futureTime, TRANSFERABLE, EMPTY_DATA))
                     .to.be.revertedWith("Token ID must be greater than zero");
             });
 
-            it("Should accept amount of zero", async function () {
+            it("Should reject amount of zero", async function () {
                 const futureTime = (await time.latest()) + 3600;
                 
-                await expect(erc1155.mint(user1.address, TOKEN_ID_1, 0, futureTime, false, EMPTY_DATA))
-                    .to.emit(erc1155, "TransferSingle")
-                    .withArgs(owner.address, ethers.ZeroAddress, user1.address, TOKEN_ID_1, 0);
+                await expect(erc1155.mint(user1.address, TOKEN_ID_1, 0, futureTime, TRANSFERABLE, EMPTY_DATA))
+                    .to.be.revertedWith("Amount must be greater than zero");
+            });
             });
 
             it("Should accept maximum token ID", async function () {
                 const futureTime = (await time.latest()) + 3600;
                 const maxTokenId = ethers.MaxUint256;
                 
-                await expect(erc1155.mint(user1.address, maxTokenId, AMOUNT_10, futureTime, false, EMPTY_DATA))
+                await expect(erc1155.mint(user1.address, maxTokenId, AMOUNT_10, futureTime, TRANSFERABLE, EMPTY_DATA))
                     .to.emit(erc1155, "TransferSingle");
             });
 
@@ -120,19 +122,19 @@ describe("SimpleERC1155", function () {
                 const futureTime = (await time.latest()) + 3600;
                 const maxAmount = ethers.MaxUint256;
                 
-                await expect(erc1155.mint(user1.address, TOKEN_ID_1, maxAmount, futureTime, false, EMPTY_DATA))
+                await expect(erc1155.mint(user1.address, TOKEN_ID_1, maxAmount, futureTime, TRANSFERABLE, EMPTY_DATA))
                     .to.emit(erc1155, "TransferSingle");
             });
 
             it("Should accept zero expiration (no expiry)", async function () {
-                await expect(erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_10, 0, false, EMPTY_DATA))
+                await expect(erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_10, 0, TRANSFERABLE, EMPTY_DATA))
                     .to.emit(erc1155, "TransferSingle");
             });
 
             it("Should accept maximum expiration timestamp", async function () {
                 const maxTimestamp = ethers.MaxUint256;
                 
-                await expect(erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_10, maxTimestamp, false, EMPTY_DATA))
+                await expect(erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_10, maxTimestamp, TRANSFERABLE, EMPTY_DATA))
                     .to.emit(erc1155, "TransferSingle");
             });
 
@@ -140,7 +142,7 @@ describe("SimpleERC1155", function () {
                 const futureTime = (await time.latest()) + 3600;
                 const largeData = "0x" + "a".repeat(2000); // 1000 bytes
                 
-                await expect(erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_10, futureTime, false, largeData))
+                await expect(erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_10, futureTime, TRANSFERABLE, largeData))
                     .to.emit(erc1155, "TransferSingle");
             });
         });
@@ -149,25 +151,38 @@ describe("SimpleERC1155", function () {
             it("Should store transferable token metadata correctly", async function () {
                 const futureTime = (await time.latest()) + 3600;
                 
-                await erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_10, futureTime, false, EMPTY_DATA);
+                await erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_10, futureTime, TRANSFERABLE, EMPTY_DATA);
                 
-                // We can't directly access _tokenMetadata, but we can verify through behavior
-                expect(await erc1155.balanceOf(user1.address, TOKEN_ID_1)).to.equal(AMOUNT_10);
+                const metadata = await erc1155.getMetadata(TOKEN_ID_1);
+                expect(metadata.exists).to.be.true;
+                expect(metadata.expiration).to.equal(futureTime);
+                expect(metadata.transferable).to.be.true;
             });
 
             it("Should store non-transferable token metadata correctly", async function () {
                 const futureTime = (await time.latest()) + 3600;
-                
-                await erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_10, futureTime, true, EMPTY_DATA);
-                
+
+                await erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_10, futureTime, NON_TRANSFERABLE, EMPTY_DATA);
+
+                const metadata = await erc1155.getMetadata(TOKEN_ID_1);
+                expect(metadata.exists).to.be.true;
+                expect(metadata.expiration).to.equal(futureTime);
+                expect(metadata.transferable).to.be.false;
+            });
+
+            it("Should store token balance correctly", async function () {
+                const futureTime = (await time.latest()) + 3600;
+
+                await erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_10, futureTime, NON_TRANSFERABLE, EMPTY_DATA);
+
                 expect(await erc1155.balanceOf(user1.address, TOKEN_ID_1)).to.equal(AMOUNT_10);
             });
 
             it("Should handle multiple tokens for same user", async function () {
                 const futureTime = (await time.latest()) + 3600;
                 
-                await erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_10, futureTime, false, EMPTY_DATA);
-                await erc1155.mint(user1.address, TOKEN_ID_2, AMOUNT_100, futureTime, true, EMPTY_DATA);
+                await erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_10, futureTime, TRANSFERABLE, EMPTY_DATA);
+                await erc1155.mint(user1.address, TOKEN_ID_2, AMOUNT_100, futureTime, NON_TRANSFERABLE, EMPTY_DATA);
                 
                 expect(await erc1155.balanceOf(user1.address, TOKEN_ID_1)).to.equal(AMOUNT_10);
                 expect(await erc1155.balanceOf(user1.address, TOKEN_ID_2)).to.equal(AMOUNT_100);
@@ -176,8 +191,8 @@ describe("SimpleERC1155", function () {
             it("Should handle same token ID for different users", async function () {
                 const futureTime = (await time.latest()) + 3600;
                 
-                await erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_10, futureTime, false, EMPTY_DATA);
-                await erc1155.mint(user2.address, TOKEN_ID_1, AMOUNT_100, futureTime, true, EMPTY_DATA);
+                await erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_10, futureTime, TRANSFERABLE, EMPTY_DATA);
+                await erc1155.mint(user2.address, TOKEN_ID_1, AMOUNT_100, futureTime, NON_TRANSFERABLE, EMPTY_DATA);
                 
                 expect(await erc1155.balanceOf(user1.address, TOKEN_ID_1)).to.equal(AMOUNT_10);
                 expect(await erc1155.balanceOf(user2.address, TOKEN_ID_1)).to.equal(AMOUNT_100);
@@ -186,73 +201,28 @@ describe("SimpleERC1155", function () {
             it("Should handle multiple mints of same token to same user", async function () {
                 const futureTime = (await time.latest()) + 3600;
                 
-                await erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_10, futureTime, false, EMPTY_DATA);
-                await erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_10, futureTime, false, EMPTY_DATA);
+                await erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_10, futureTime, TRANSFERABLE, EMPTY_DATA);
+                await erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_10, futureTime, NON_TRANSFERABLE, EMPTY_DATA);
                 
                 expect(await erc1155.balanceOf(user1.address, TOKEN_ID_1)).to.equal(AMOUNT_10 + AMOUNT_10);
             });
-            it("should store the metadata correctly for non-transferable tokens", async function () {
-                const futureTime = (await time.latest()) + 3600;
-                
-                await erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_10, futureTime, true, EMPTY_DATA);
-                
-                const metadata = await erc1155.getMetatadata(TOKEN_ID_1, user1.address);
-                expect(metadata.id).to.equal(TOKEN_ID_1);
-                expect(metadata.user).to.equal(user1.address);
-                expect(metadata.amount).to.equal(AMOUNT_10);
-                expect(metadata.expiration).to.equal(futureTime);
-                expect(metadata.nonTransferable).to.be.true;
-            });
-            it("should store the metadata correctly for transferable tokens", async function () {
-                const futureTime = (await time.latest()) + 3600;
-                
-                await erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_10, futureTime, false, EMPTY_DATA);
-                
-                const metadata = await erc1155.getMetatadata(TOKEN_ID_1, user1.address);
-                expect(metadata.id).to.equal(TOKEN_ID_1);
-                expect(metadata.user).to.equal(user1.address);
-                expect(metadata.amount).to.equal(AMOUNT_10);
-                expect(metadata.expiration).to.equal(futureTime);
-                expect(metadata.nonTransferable).to.be.false;
-            });
             it("should handle minting with zero expiration", async function () {    
-                const futureTime = (await time.latest()) + 3600;
                 
-                await erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_10, 0, false, EMPTY_DATA);
-                
-                const metadata = await erc1155.getMetatadata(TOKEN_ID_1, user1.address);
-                expect(metadata.id).to.equal(TOKEN_ID_1);
-                expect(metadata.user).to.equal(user1.address);
-                expect(metadata.amount).to.equal(AMOUNT_10);
+                await erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_10, 0, TRANSFERABLE, EMPTY_DATA);
+
+                const metadata = await erc1155.getMetadata(TOKEN_ID_1);
                 expect(metadata.expiration).to.equal(0); // No expiration
-                expect(metadata.nonTransferable).to.be.false;
+                expect(metadata.transferable).to.be.true;
             });
             it("should handle minting with maximum expiration", async function () {
-                const futureTime = (await time.latest()) + 3600;
                 const maxExpiration = ethers.MaxUint256;
                 
-                await erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_10, maxExpiration, false, EMPTY_DATA);
-                
-                const metadata = await erc1155.getMetatadata(TOKEN_ID_1, user1.address);
-                expect(metadata.id).to.equal(TOKEN_ID_1);
-                expect(metadata.user).to.equal(user1.address);
-                expect(metadata.amount).to.equal(AMOUNT_10);
+                await erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_10, maxExpiration, TRANSFERABLE, EMPTY_DATA);
+
+                const metadata = await erc1155.getMetadata(TOKEN_ID_1);
                 expect(metadata.expiration).to.equal(maxExpiration);
-                expect(metadata.nonTransferable).to.be.false;
+                expect(metadata.transferable).to.be.true;
             });
-            it("should handle minting with large data payload", async function () {
-                const futureTime = (await time.latest()) + 3600;
-                const largeData = "0x" + "a".repeat(2000); // 1000 bytes
-                
-                await erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_10, futureTime, false, largeData);
-                
-                const metadata = await erc1155.getMetatadata(TOKEN_ID_1, user1.address);
-                expect(metadata.id).to.equal(TOKEN_ID_1);
-                expect(metadata.user).to.equal(user1.address);
-                expect(metadata.amount).to.equal(AMOUNT_10);
-                expect(metadata.expiration).to.equal(futureTime);
-                expect(metadata.nonTransferable).to.be.false;
-            });     
         });
 
         describe("Balance Updates", function () {
@@ -261,7 +231,7 @@ describe("SimpleERC1155", function () {
                 
                 expect(await erc1155.balanceOf(user1.address, TOKEN_ID_1)).to.equal(0);
                 
-                await erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_10, futureTime, false, EMPTY_DATA);
+                await erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_10, futureTime, TRANSFERABLE, EMPTY_DATA);
                 
                 expect(await erc1155.balanceOf(user1.address, TOKEN_ID_1)).to.equal(AMOUNT_10);
             });
@@ -269,54 +239,45 @@ describe("SimpleERC1155", function () {
             it("Should accumulate balance for additional mints", async function () {
                 const futureTime = (await time.latest()) + 3600;
                 
-                await erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_10, futureTime, false, EMPTY_DATA);
-                await erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_100, futureTime, false, EMPTY_DATA);
+                await erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_10, futureTime, TRANSFERABLE, EMPTY_DATA);
+                await erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_100, futureTime, TRANSFERABLE, EMPTY_DATA);
                 
                 expect(await erc1155.balanceOf(user1.address, TOKEN_ID_1)).to.equal(AMOUNT_10 + AMOUNT_100);
             });
-
-            it("Should handle zero amount mint", async function () {
-                const futureTime = (await time.latest()) + 3600;
-                
-                await erc1155.mint(user1.address, TOKEN_ID_1, 0, futureTime, false, EMPTY_DATA);
-                
-                expect(await erc1155.balanceOf(user1.address, TOKEN_ID_1)).to.equal(0);
-            });
         });
-    });
+    
 
     describe("_setTokenMetadata", function () {
         // This is an internal function, so we test it indirectly through mint
         describe("Metadata Creation", function () {
-            it("Should create metadata with correct URI", async function () {
-                const futureTime = (await time.latest()) + 3600;
-                
-                await erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_10, futureTime, false, EMPTY_DATA);
-                
-                // Verify URI is accessible
-                expect(await erc1155.uri(TOKEN_ID_1)).to.equal(BASE_URI);
-            });
 
             it("Should handle different token IDs with same base URI", async function () {
                 const futureTime = (await time.latest()) + 3600;
                 
-                await erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_10, futureTime, false, EMPTY_DATA);
-                await erc1155.mint(user1.address, TOKEN_ID_2, AMOUNT_10, futureTime, false, EMPTY_DATA);
+                await erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_10, futureTime, TRANSFERABLE, EMPTY_DATA);
+                await erc1155.mint(user1.address, TOKEN_ID_2, AMOUNT_10, futureTime, TRANSFERABLE, EMPTY_DATA);
                 
                 expect(await erc1155.uri(TOKEN_ID_1)).to.equal(BASE_URI);
                 expect(await erc1155.uri(TOKEN_ID_2)).to.equal(BASE_URI);
             });
 
-            it("Should handle metadata overwrites for same token ID and user", async function () {
+            it("Should handle metadata overwrites for same token ID", async function () {
                 const futureTime = (await time.latest()) + 3600;
                 
                 // First mint
-                await erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_10, futureTime, false, EMPTY_DATA);
+                await erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_10, futureTime, TRANSFERABLE, EMPTY_DATA);
                 expect(await erc1155.balanceOf(user1.address, TOKEN_ID_1)).to.equal(AMOUNT_10);
+
+                const metadataBefore = await erc1155.getMetadata(TOKEN_ID_1);
+                expect(metadataBefore.exists).to.equal(true);
+                expect(metadataBefore.expiration).to.equal(futureTime);
+                expect(metadataBefore.transferable).to.equal(TRANSFERABLE);
                 
-                // Second mint - should overwrite metadata but add to balance
-                await erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_100, futureTime, true, EMPTY_DATA);
-                expect(await erc1155.balanceOf(user1.address, TOKEN_ID_1)).to.equal(AMOUNT_10 + AMOUNT_100);
+                await erc1155.updateMetadata(TOKEN_ID_1, 0, NON_TRANSFERABLE);
+                const metadataAfter = await erc1155.getMetadata(TOKEN_ID_1);
+                expect(metadataAfter.exists).to.equal(true);
+                expect(metadataAfter.expiration).to.equal(0);
+                expect(metadataAfter.transferable).to.equal(NON_TRANSFERABLE);
             });
         });
     });
@@ -324,39 +285,11 @@ describe("SimpleERC1155", function () {
     describe("_update", function () {
         beforeEach(async function () {
             const futureTime = (await time.latest()) + 3600;
-            await erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_100, futureTime, false, EMPTY_DATA); // transferable
-            await erc1155.mint(user1.address, TOKEN_ID_2, AMOUNT_100, futureTime, true, EMPTY_DATA);  // non-transferable
-            await erc1155.mint(user1.address, TOKEN_ID_3, AMOUNT_100, futureTime, false, EMPTY_DATA); // transferable
-            await erc1155.mint(user2.address, TOKEN_ID_3, AMOUNT_100, futureTime, false, EMPTY_DATA); // transferable
+            await erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_100, futureTime, TRANSFERABLE, EMPTY_DATA); // transferable
+            await erc1155.mint(user1.address, TOKEN_ID_2, AMOUNT_100, futureTime, NON_TRANSFERABLE, EMPTY_DATA);  // non-transferable
+            await erc1155.mint(user1.address, TOKEN_ID_3, AMOUNT_100, futureTime, TRANSFERABLE, EMPTY_DATA); // transferable
+            await erc1155.mint(user2.address, TOKEN_ID_3, AMOUNT_100, futureTime, TRANSFERABLE, EMPTY_DATA); // transferable
         });
-
-        // describe("Owner Override", function () {
-        //     it("Should allow owner to transfer any token", async function () {
-        //         await expect(erc1155.safeTransferFrom(user1.address, user2.address, TOKEN_ID_1, AMOUNT_10, EMPTY_DATA))
-        //             .to.emit(erc1155, "TransferSingle")
-        //             .withArgs(owner.address, user1.address, user2.address, TOKEN_ID_1, AMOUNT_10);
-        //     });
-
-        //     it("Should allow owner to transfer non-transferable tokens", async function () {
-        //         await expect(erc1155.safeTransferFrom(user1.address, user2.address, TOKEN_ID_2, AMOUNT_10, EMPTY_DATA))
-        //             .to.emit(erc1155, "TransferSingle")
-        //             .withArgs(owner.address, user1.address, user2.address, TOKEN_ID_2, AMOUNT_10);
-        //     });
-
-        //     it("Should allow owner to batch transfer mixed tokens", async function () {
-        //         const ids = [TOKEN_ID_1, TOKEN_ID_2];
-        //         const amounts = [AMOUNT_10, AMOUNT_10];
-                
-        //         await expect(erc1155.safeBatchTransferFrom(user1.address, user2.address, ids, amounts, EMPTY_DATA))
-        //             .to.emit(erc1155, "TransferBatch")
-        //             .withArgs(owner.address, user1.address, user2.address, ids, amounts);
-        //     });
-
-        //     it("Should allow owner to transfer zero amounts", async function () {
-        //         await expect(erc1155.safeTransferFrom(user1.address, user2.address, TOKEN_ID_1, 0, EMPTY_DATA))
-        //             .to.emit(erc1155, "TransferSingle");
-        //     });
-        // });
 
         describe("Regular User Transfers", function () {
             it("Should allow transfer of transferable tokens", async function () {
@@ -366,18 +299,18 @@ describe("SimpleERC1155", function () {
 
             it("Should prevent transfer of non-transferable tokens", async function () {
                 await expect(erc1155.connect(user1).safeTransferFrom(user1.address, user2.address, TOKEN_ID_2, AMOUNT_10, EMPTY_DATA))
-                    .to.be.revertedWith("ERC1155 is non-transferable");
+                    .to.be.revertedWith(`token id ${TOKEN_ID_2} is non-transferable`);
             });
 
             it("Should prevent partial transfer of non-transferable tokens", async function () {
                 await expect(erc1155.connect(user1).safeTransferFrom(user1.address, user2.address, TOKEN_ID_2, 1, EMPTY_DATA))
-                    .to.be.revertedWith("ERC1155 is non-transferable");
+                    .to.be.revertedWith(`token id ${TOKEN_ID_2} is non-transferable`);
             });
 
             it("Should allow batch transfer of only transferable tokens", async function () {
                 const futureTime = (await time.latest()) + 3600;
-                await erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_10, futureTime, false, EMPTY_DATA); // transferable
-                await erc1155.mint(user1.address, TOKEN_ID_3, AMOUNT_10, futureTime, false, EMPTY_DATA); // transferable
+                await erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_10, futureTime, TRANSFERABLE, EMPTY_DATA); // transferable
+                await erc1155.mint(user1.address, TOKEN_ID_3, AMOUNT_10, futureTime, TRANSFERABLE, EMPTY_DATA); // transferable
 
                 const ids = [TOKEN_ID_1, TOKEN_ID_3];
                 const amounts = [AMOUNT_10, AMOUNT_10];
@@ -391,7 +324,7 @@ describe("SimpleERC1155", function () {
                 const amounts = [AMOUNT_10, AMOUNT_10];
                 
                 await expect(erc1155.connect(user1).safeBatchTransferFrom(user1.address, user2.address, ids, amounts, EMPTY_DATA))
-                    .to.be.revertedWith("ERC1155 is non-transferable");
+                    .to.be.revertedWith(`token id ${TOKEN_ID_2} is non-transferable`);
             });
 
             it("Should handle approved transfers", async function () {
@@ -405,120 +338,7 @@ describe("SimpleERC1155", function () {
                 await erc1155.connect(user1).setApprovalForAll(user2.address, true);
                 
                 await expect(erc1155.connect(user2).safeTransferFrom(user1.address, user3.address, TOKEN_ID_2, AMOUNT_10, EMPTY_DATA))
-                    .to.be.revertedWith("ERC1155 is non-transferable");
-            });
-        });
-
-        describe("Metadata Updates", function () {
-            it("Should update user field in metadata on successful transfer", async function () {
-
-                const metadataBefore = await erc1155.getMetatadata(TOKEN_ID_1, user1.address);
-
-                await erc1155.connect(user1).safeTransferFrom(user1.address, user2.address, TOKEN_ID_1, AMOUNT_10, EMPTY_DATA);
-                
-                // Verify transfer occurred
-                expect(await erc1155.balanceOf(user1.address, TOKEN_ID_1)).to.equal(AMOUNT_100 - AMOUNT_10);
-                expect(await erc1155.balanceOf(user2.address, TOKEN_ID_1)).to.equal(AMOUNT_10);
-
-                const metadataAfter = await erc1155.getMetatadata(TOKEN_ID_1, user2.address);
-                const metadataAfterUser1 = await erc1155.getMetatadata(TOKEN_ID_1, user1.address);
-
-                // Verify metadata update
-                expect(metadataAfter.id).to.equal(metadataBefore.id);
-                expect(metadataAfter.user).to.equal(user2.address);
-                expect(metadataAfter.amount).to.equal(AMOUNT_10);
-                expect(metadataAfter.expiration).to.equal(metadataBefore.expiration);
-                expect(metadataAfter.nonTransferable).to.equal(metadataBefore.nonTransferable);
-                expect(metadataAfter.uri).to.equal(metadataBefore.uri);
-                expect(metadataBefore.user).to.equal(user1.address);
-                expect(metadataAfterUser1.id).to.equal(metadataBefore.id);
-                expect(metadataAfterUser1.user).to.equal(user1.address);
-                expect(metadataAfterUser1.amount).to.equal(AMOUNT_100 - AMOUNT_10);
-                expect(metadataAfterUser1.expiration).to.equal(metadataBefore.expiration);
-                expect(metadataAfterUser1.nonTransferable).to.equal(metadataBefore.nonTransferable);
-                expect(metadataAfterUser1.uri).to.equal(metadataBefore.uri);
-            });
-
-            it("Should update metadata for batch transfers", async function () {
-            const ids = [TOKEN_ID_1, TOKEN_ID_3];
-            const amounts = [AMOUNT_10, AMOUNT_10];
-
-            const user2BalanceBefore1 = await erc1155.balanceOf(user2.address, TOKEN_ID_1);
-            const user2BalanceBefore3 = await erc1155.balanceOf(user2.address, TOKEN_ID_3);
-
-            // Get existing metadata to check expiration
-            const existingMetadata1 = await erc1155.getMetatadata(TOKEN_ID_1, user1.address);
-            const existingMetadata3 = await erc1155.getMetatadata(TOKEN_ID_3, user1.address);
-
-            await erc1155.connect(user1).safeBatchTransferFrom(user1.address, user2.address, ids, amounts, EMPTY_DATA);
-
-            const metadataUser2Id1 = await erc1155.getMetatadata(TOKEN_ID_1, user2.address);
-            const metadataUser2Id3 = await erc1155.getMetatadata(TOKEN_ID_3, user2.address);
-
-            const metadataUser1Id1 = await erc1155.getMetatadata(TOKEN_ID_1, user1.address);
-            const metadataUser1Id3 = await erc1155.getMetatadata(TOKEN_ID_3, user1.address);
-
-            expect(metadataUser2Id1.id).to.equal(TOKEN_ID_1);
-            expect(metadataUser2Id1.user).to.equal(user2.address);
-            expect(metadataUser2Id1.amount).to.equal(ethers.toNumber(user2BalanceBefore1) + AMOUNT_10);
-            expect(metadataUser2Id1.expiration).to.equal(existingMetadata1.expiration);
-            expect(metadataUser2Id1.nonTransferable).to.be.false;
-            expect(metadataUser2Id1.uri).to.equal(await erc1155.uri(TOKEN_ID_1));
-
-            expect(metadataUser2Id3.id).to.equal(TOKEN_ID_3);
-            expect(metadataUser2Id3.user).to.equal(user2.address);
-            expect(metadataUser2Id3.amount).to.equal(ethers.toNumber(user2BalanceBefore3) + AMOUNT_10);
-            expect(metadataUser2Id3.expiration).to.equal(existingMetadata3.expiration);
-            expect(metadataUser2Id3.nonTransferable).to.be.false;
-            expect(metadataUser2Id3.uri).to.equal(await erc1155.uri(TOKEN_ID_3));
-            
-            expect(metadataUser1Id1.id).to.equal(TOKEN_ID_1);
-            expect(metadataUser1Id1.user).to.equal(user1.address);
-            expect(metadataUser1Id1.amount).to.equal(AMOUNT_100 - AMOUNT_10);
-            expect(metadataUser1Id1.expiration).to.equal(existingMetadata1.expiration);
-            expect(metadataUser1Id1.nonTransferable).to.be.false;
-            expect(metadataUser1Id1.uri).to.equal(await erc1155.uri(TOKEN_ID_1));       
-
-            expect(metadataUser1Id3.id).to.equal(TOKEN_ID_3);
-            expect(metadataUser1Id3.user).to.equal(user1.address);
-            expect(metadataUser1Id3.amount).to.equal(AMOUNT_100 - AMOUNT_10);
-            expect(metadataUser1Id3.expiration).to.equal(existingMetadata3.expiration);
-            expect(metadataUser1Id3.nonTransferable).to.be.false;
-            expect(metadataUser1Id3.uri).to.equal(await erc1155.uri(TOKEN_ID_3));
-            
-
-            // // Verify metadata update - use correct variable names and get expiration from existing metadata
-            // expect(await erc1155.getMetatadata(TOKEN_ID_1, user2.address)).to.deep.equal({
-            //     id: TOKEN_ID_1,
-            //     user: user2.address,
-            //     amount: ethers.toNumber(user2BalanceBefore1) + AMOUNT_10, // ✅ Use correct variable
-            //     expiration: existingMetadata1.expiration,                 // ✅ Get from existing metadata
-            //     nonTransferable: false,
-            //     uri: await erc1155.uri(TOKEN_ID_1)
-            // });
-            
-            // expect(await erc1155.getMetatadata(TOKEN_ID_3, user2.address)).to.deep.equal({
-            //     id: TOKEN_ID_3,
-            //     user: user2.address,
-            //     amount: ethers.toNumber(user2BalanceBefore3) + AMOUNT_10, // ✅ Use correct variable
-            //     expiration: existingMetadata3.expiration,                 // ✅ Get from existing metadata
-            //     nonTransferable: false,
-            //     uri: await erc1155.uri(TOKEN_ID_3)
-            //     });
-            });
-
-            it("Should not update metadata on failed transfers", async function () {
-
-                const balanceBefore = await erc1155.balanceOf(user1.address, TOKEN_ID_2);
-                // Try to transfer non-transferable token
-                await expect(erc1155.connect(user1).safeTransferFrom(user1.address, user2.address, TOKEN_ID_2, AMOUNT_10, EMPTY_DATA))
-                    .to.be.revertedWith("ERC1155 is non-transferable");
-
-                const balanceAfter = await erc1155.balanceOf(user1.address, TOKEN_ID_2);
-                
-                // Verify no change in balances
-                expect(balanceAfter).to.equal(balanceBefore);
-                expect(await erc1155.balanceOf(user2.address, TOKEN_ID_2)).to.equal(0);
+                    .to.be.revertedWith(`token id ${TOKEN_ID_2} is non-transferable`);
             });
         });
 
@@ -569,7 +389,7 @@ describe("SimpleERC1155", function () {
                 const nonExistentId = 999;
                 
                 await expect(erc1155.connect(user1).safeTransferFrom(user1.address, user2.address, nonExistentId, 1, EMPTY_DATA))
-                    .to.be.revertedWithCustomError(erc1155, "ERC1155InsufficientBalance");
+                    .to.be.revertedWith(`token id ${nonExistentId} does not exist`);
             });
 
             it("Should handle transfer more than balance", async function () {
@@ -582,9 +402,9 @@ describe("SimpleERC1155", function () {
     describe("ERC1155 Standard Functions", function () {
         beforeEach(async function () {
             const futureTime = (await time.latest()) + 3600;
-            await erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_10, futureTime, false, EMPTY_DATA);
-            await erc1155.mint(user1.address, TOKEN_ID_2, AMOUNT_100, futureTime, true, EMPTY_DATA);
-            await erc1155.mint(user2.address, TOKEN_ID_1, AMOUNT_10, futureTime, false, EMPTY_DATA);
+            await erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_10, futureTime, TRANSFERABLE, EMPTY_DATA);
+            await erc1155.mint(user1.address, TOKEN_ID_2, AMOUNT_100, futureTime, NON_TRANSFERABLE, EMPTY_DATA);
+            await erc1155.mint(user2.address, TOKEN_ID_1, AMOUNT_10, futureTime, TRANSFERABLE, EMPTY_DATA);
         });
 
         describe("balanceOf", function () {
@@ -677,7 +497,7 @@ describe("SimpleERC1155", function () {
             const futureTime = (await time.latest()) + 3600;
             
             // 1. Mint
-            await erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_100, futureTime, false, EMPTY_DATA);
+            await erc1155.mint(user1.address, TOKEN_ID_1, AMOUNT_100, futureTime, TRANSFERABLE, EMPTY_DATA);
             expect(await erc1155.balanceOf(user1.address, TOKEN_ID_1)).to.equal(AMOUNT_100);
             
             // 3. Transfer via approved operator
