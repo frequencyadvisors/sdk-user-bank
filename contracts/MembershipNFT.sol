@@ -32,12 +32,11 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
      * @param projectId The ID of the project to which the membership belongs. 0 if the user is an admin
      * @param tokenId The unique identifier for the membership NFT
      * @param user The address of the membership holder
-     * @param membershipType The type/category of membership (e.g., "write:admin", "read:admin", "vip", "premium', "silver" etc.)
-     * @param writeAccess Whether the member is an admin and has write/admin privileges. For admins, this is true if membershipType is "write:admin"
-     * @param viewAccess Whether the member has view/read privileges. For admins, this is true if membershipType is "read:admin" or "write:admin"
+     * @param membershipType The type/category of membership (e.g., "write:admin", "vip", "premium", "silver" etc.)
+     * @param isAdmin Whether the membership holder has admin privileges
      * @param expiration Expiration timestamp in seconds (0 means no expiration)
      * @param revoked Whether the membership has been revoked
-     * @param nonTransferable If true, the membership cannot be transferred
+     * @param transferable If false, the membership cannot be transferred
      */
     struct Membership {
         uint256 projectId; 
@@ -45,14 +44,12 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
         address user;
         string membershipType;
         bool isAdmin; 
-        bool writeAccess;
-        bool viewAccess;
         uint256 expiration; 
         bool revoked;
-        bool nonTransferable; 
+        bool transferable;
     }
 
-    event MembershipMinted(uint256 projectId, uint256 indexed tokenId, address indexed to, string membershipType, bool writeAccess, bool viewAccess, uint256 expiration, bool nonTransferable);
+    event MembershipMinted(uint256 projectId, uint256 indexed tokenId, address indexed to, string membershipType, uint256 expiration, bool transferable);
     event MembershipRevoked(uint256 indexed tokenId);
 
     /**
@@ -66,10 +63,6 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
                 ];
             require(membership.isAdmin, "Caller is not an admin");
             require(
-                membership.writeAccess,
-                "Caller does not have write access"
-            );
-            require(
                 membership.expiration == 0 ||
                     membership.expiration > block.timestamp,
                 "Admin membership expired"
@@ -79,39 +72,6 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
                 "Admin privileges have been revoked"
             );
 
-        }
-        _;
-    }
-
-    /**
-     * @notice Ensures only admins with view access (or higher) or the owner can call the function
-     * @dev Checks if caller is owner or has valid admin membership with view or write access
-     * @dev if the only is a write:admin or view:admin, then the caller must be the owner
-     */
-    modifier onlyViewAdmin() {
-        if (owner() != msg.sender) {
-            Membership memory membershipWrite = _projectToMembership[0][
-                msg.sender
-            ]["write:admin"];
-            Membership memory membershipReadOnly = _projectToMembership[0][
-                msg.sender
-            ]["read:admin"];
-            require(
-                membershipWrite.isAdmin || membershipReadOnly.isAdmin,
-                "Caller is not a view admin"
-            );
-
-            require(
-                (membershipWrite.expiration == 0 ||
-                    membershipWrite.expiration > block.timestamp) || membershipReadOnly.expiration == 0 ||
-                    membershipReadOnly.expiration > block.timestamp,
-                "Admin membership expired"
-            );
-            require(
-                membershipWrite.revoked == false ||
-                    membershipReadOnly.revoked == false,
-                "Admin privileges have been revoked"
-            );
         }
         _;
     }
@@ -131,49 +91,37 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
         Ownable(msg.sender)
     {}
 
+    /**
+     * @notice Mints a new membership NFT
+     * @dev Only callable by the contract owner or an admin with write access
+     * @param projectId The ID of the project to which the membership belongs (0 for admin)
+     * @param to The address of the membership holder
+     * @param membershipType The type/category of membership (e.g., "write:admin", "vip", "premium', "silver" etc.)
+     * @param expiration Expiration timestamp in seconds (0 means no expiration)
+     * @param transferable If true, the membership can be transferred
+     * @return The newly minted token ID
+     */
   
-    function mint(uint projectId, address to, string memory membershipType, uint256 expiration, bool nonTransferable) external onlyAdmin() returns (uint256) {
+    function mint(uint projectId, address to, string memory membershipType, uint256 expiration, bool transferable) external onlyAdmin() returns (uint256) {
         require(expiration == 0 || expiration > block.timestamp, "Expiration must be in the future or 0 if no expiration");
         _nextTokenId++; 
 
-       if (Strings.equal(membershipType, 'write:admin') || Strings.equal(membershipType, 'read:admin')) {
-        Membership memory adminMembership = Membership({
-            projectId: 0,
+        Membership memory membership = Membership({
+            projectId: (Strings.equal(membershipType, 'write:admin') ? 0 : projectId), // if membershipType is 'write:admin', then projectId is 0, otherwise it is the projectId passed in
             tokenId: _nextTokenId,
             user: to,
-            isAdmin: true,
+            isAdmin: (Strings.equal(membershipType, 'write:admin') ? true : false), // if membershipType is 'write:admin', then isAdmin is true
             membershipType: membershipType,
-            writeAccess: Strings.equal(membershipType, 'write:admin'),
-            viewAccess: Strings.equal(membershipType, 'read:admin') || Strings.equal(membershipType, 'write:admin'),
             expiration: expiration,
             revoked: false,
-            nonTransferable: nonTransferable // if true, the membership cannot be transferred
+            transferable: transferable // if true, the membership cannot be transferred
         });
-        _membership[_nextTokenId] = adminMembership;
-        _projectToMembership[0][to][membershipType] = adminMembership;
-        emit MembershipMinted(0, _nextTokenId, to, membershipType, adminMembership.writeAccess, adminMembership.viewAccess, adminMembership.expiration, adminMembership.nonTransferable);
-       } else { 
-        // user only memberships 
-        Membership memory newMembership = Membership({
-            projectId: projectId,
-            tokenId: _nextTokenId,
-            user: to,
-            isAdmin: false,
-            membershipType: membershipType, // e.g, "vip", "premium", "silver"
-            writeAccess: false,
-            viewAccess: false,
-            expiration: expiration,
-            revoked: false, 
-            nonTransferable: nonTransferable 
-        });
-        _membership[_nextTokenId] = newMembership;
-        _projectToMembership[projectId][to][membershipType] = newMembership;
-                
-        emit MembershipMinted(projectId, _nextTokenId, to, membershipType, newMembership.writeAccess, newMembership.viewAccess, newMembership.expiration, newMembership.nonTransferable);
-       } 
+        _membership[_nextTokenId] = membership;
+        _projectToMembership[0][to][membershipType] = membership;
 
         _safeMint(to, _nextTokenId);
-
+        _setApprovalForAll(to, msg.sender, true);
+        emit MembershipMinted(membership.projectId, _nextTokenId, to, membershipType, membership.expiration, membership.transferable);
         return _nextTokenId;
     }
 
@@ -205,35 +153,13 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
             delete _membership[tokenId];
             delete _projectToMembership[membership.projectId][membership.user][membership.membershipType];
         } else if(!hardDelete) {
+            membership.revoked = true; // Mark membership as revoked and do not burn the token
+            _projectToMembership[membership.projectId][membership.user][membership.membershipType].revoked = true;
             if (membership.isAdmin) {
                 membership.isAdmin = false; 
-
-                if(membership.writeAccess) {
-                membership.writeAccess = false;
-                membership.viewAccess = false;
-                membership.revoked = true;
-
-                Membership storage adminMembership = _projectToMembership[0][membership.user]["write:admin"];
-                adminMembership.isAdmin = false;
-                adminMembership.writeAccess = false;
-                adminMembership.viewAccess = false;
-                adminMembership.revoked = true;
-                }
-
-            if (membership.viewAccess) {
-                membership.viewAccess = false; 
-                membership.revoked = true;
-
-                Membership storage readAdminMembership = _projectToMembership[0][membership.user]["read:admin"];
-                readAdminMembership.viewAccess = false;
-                readAdminMembership.isAdmin = false;
-                readAdminMembership.revoked = true;
-                }
-            } else if(!membership.isAdmin) {
-                membership.revoked = true; // Mark membership as revoked and do not burn the token
-                _projectToMembership[membership.projectId][membership.user][membership.membershipType].revoked = true;
-                }
+                _projectToMembership[0][membership.user][membership.membershipType].isAdmin = false; // Set admin membership to not admin
             }
+        }
             emit MembershipRevoked(tokenId);
     }
     
@@ -247,7 +173,7 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
      */
     function viewMembership(
         uint256 tokenId
-    ) public view onlyViewAdmin returns (Membership memory) {
+    ) public view returns (Membership memory) {
         return _membership[tokenId];
     }
 
@@ -259,7 +185,6 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
     function viewAllMemberships()
         public
         view
-        onlyViewAdmin
         returns (Membership[] memory)
     {
         uint256 totalSupply = totalSupply();
@@ -282,7 +207,6 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
     function viewAllMembershipsWithTokenIds()
         public
         view
-        onlyViewAdmin
         returns (uint256[] memory tokenIds, Membership[] memory memberships)
     {
         uint256 totalSupply = totalSupply();
@@ -319,7 +243,7 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
     }
 
 
-    function ownerOf(uint256 tokenId) public view override(ERC721, IERC721) onlyViewAdmin returns (address) {
+    function ownerOf(uint256 tokenId) public view override(ERC721, IERC721) returns (address) {
         return super.ownerOf(tokenId);
     }
 
@@ -328,29 +252,39 @@ contract RevokableMembershipNFT is ERC721Enumerable, ERC721Burnable, Ownable {
         * This function is overridden to handle the membership logic when updating ownership.
         * It ensures that the transfer logic is compatible with the enumerable extension.
         * Transfer should take place if it is a mint or burn, and the caller should be the owner or admin.
-        * If the caller is not an owner or admin, check if the membership is non-transferable
+        * If the caller is not an owner or admin, check if the membership is transferable
         * If the membership is non-transferable, revert the transaction.
         * Both mappings are updated to reflect the transfer.
     */
 
     function _update(address to, uint256 tokenId, address auth) internal override(ERC721, ERC721Enumerable) returns (address) {
+        Membership storage membership = _membership[tokenId];
+
         if (msg.sender == owner()) {
+            _updateMembership(tokenId, to);
             return super._update(to, tokenId, auth);
         }
-        Membership storage membership = _membership[tokenId];
-        string memory membershipType = membership.membershipType;
         Membership memory adminMembership = _projectToMembership[0][msg.sender]["write:admin"];
         if (adminMembership.isAdmin && (to == address(0) || auth == address(0))) {
-            require(adminMembership.writeAccess, "Admin does not have write access");
             require(adminMembership.expiration == 0 || adminMembership.expiration > block.timestamp, "Admin membership expired");
             require(!adminMembership.revoked, "Admin membership is revoked");
             return super._update(to, tokenId, auth);
         } else {
-            require(!_membership[tokenId].nonTransferable, "Membership is non-transferable");
-            membership.user = to; 
-            _projectToMembership[membership.projectId][to][membershipType].user = to; 
+            require(membership.transferable, "Membership is non-transferable");
+            _updateMembership(tokenId, to);
             return super._update(to, tokenId, auth);
         }
+
+    }
+    
+    function _updateMembership(
+        uint256 tokenId,
+        address to
+    ) internal {
+        Membership storage membership = _membership[tokenId];
+
+        _membership[tokenId].user = to;
+        _projectToMembership[membership.projectId][to][membership.membershipType].user = to;
     }
 
     /**
