@@ -26,9 +26,9 @@ module.exports = {
       chainId: 80069,
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
     },
-    zeeve: {
-        url: "https://rpc.frequency.zeeve.net",
-        chainId: 53716,
+    gelato: {
+        url: "https://rpc.testnet.superfreeq.com",
+        chainId: 80087,
         accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
     }
   },
