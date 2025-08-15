@@ -1,6 +1,11 @@
 const hre = require("hardhat");
 
 async function main() {
+
+    function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
     const name = "RevocableNFT";
     const symbol = "RNFT";
 
@@ -9,6 +14,8 @@ async function main() {
     await contract.waitForDeployment(); // ✅ Use this in Hardhat v2.17+
 
     console.log("✅ Contract deployed to:", await contract.getAddress());
+
+    await delay(10000); // Wait for 10 seconds to ensure the contract is fully deployed and ready
 
     const bence = "0x9EB4B6861e2470F5CbB6EBe62F3476a1D45Ec0C9"; 
     const hiren = "0xCA567B480a90F3ccb4888EBdCD78BC29dBf7047d";
@@ -24,10 +31,13 @@ async function main() {
     const auth0WalletAddresses = [bence, hiren, kirsty, toba, pasquale, nish, ade_1, ade_2, ade_3, iqra]; 
     const [owner] = await hre.ethers.getSigners();
 
-    auth0WalletAddresses.forEach(async (address) => {
+  
+    for (const address of auth0WalletAddresses) {
+        try {
+        await delay(5000); // Wait for 5 seconds before each minting to avoid rate limits and low nonce error
         const tx = await contract.connect(owner).mint(1, address, "write:admin", 0, true);
         const receipt = await tx.wait(1);
-        console.log(`Minting transaction successful for ${address}: ${receipt.status === 1}`);
+        console.log(`✅ Minting transaction successful for ${address} with hash: ${receipt.hash}`);
 
         const transferEvent = receipt.logs
         .map(log => {
@@ -41,12 +51,15 @@ async function main() {
         .find(e => e.name === "Transfer");
 
         const tokenId = transferEvent?.args.tokenId;
-        console.log("Minted token ID:", tokenId.toString());
+        await delay(5000); // Wait for 5 seconds before checking membership to ensure the transaction is finalised
 
         const membership = await contract.viewMembership(tokenId);
-        console.log(`Membership minted: membership ${membership.membershipType} to ${membership.user} with token ID ${membership.tokenId}`);
-        console.log(`is transferable: ${membership.transferable}, expiration: ${membership.expiration}`);
-    });
+        console.log(`Membership minted: membership ${membership.membershipType} to ${membership.user} with token ID ${membership.tokenId}. is transferable: ${membership.transferable}. expiration: ${membership.expiration}`);
+        }
+        catch (error) {
+            console.error(`Error minting membership for ${address}:`, error.message);
+        }
+    };
 }
 
 main().catch((error) => {
