@@ -27,6 +27,7 @@ async function main() {
     const ade_2 = "0x0339C73583636dB77f6eC8F7a9d2c922b329E697";
     const ade_3 = "0x35e35a48d3b6edd3E91DB2C70887e0B6D1339989"; 
     const iqra = "0x3CEDad48A59e2Be2Be8FF22F494F316e34b4DEC5";
+    const shane = "0xd6A5fa835f4919054824517B02f895B3C218D156";
 
     const auth0WalletAddresses = [bence, hiren, kirsty, toba, pasquale, nish, ade_1, ade_2, ade_3, iqra]; 
     const [owner] = await hre.ethers.getSigners();
