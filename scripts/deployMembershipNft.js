@@ -16,8 +16,12 @@ async function main() {
     const toba = "0x4950b897348004B8b2bFF1D37788147F9612bd56"; 
     const pasquale = "0x766E360ce143a4959396Dd5DbBA2808F8092D6f9";
     const nish = "0xF5abbD37397E8dB85A25E5De472a932807Cb4220"; 
+    const ade_1 = "0xF50EA4041C38Ddc5A4181155975eA1d797A163dB";
+    const ade_2 = "0x0339C73583636dB77f6eC8F7a9d2c922b329E697";
+    const ade_3 = "0x35e35a48d3b6edd3E91DB2C70887e0B6D1339989"; 
+    const iqra = "0x3CEDad48A59e2Be2Be8FF22F494F316e34b4DEC5";
 
-    const auth0WalletAddresses = [bence, hiren, kirsty, toba, pasquale, nish]; 
+    const auth0WalletAddresses = [bence, hiren, kirsty, toba, pasquale, nish, ade_1, ade_2, ade_3, iqra]; 
     const [owner] = await hre.ethers.getSigners();
 
     auth0WalletAddresses.forEach(async (address) => {
